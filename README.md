@@ -36,6 +36,26 @@ A tmux plugin inspired by [flash.nvim](https://github.com/folke/flash.nvim) that
 
     Press `<tmux_prefix> + U` (capital u, as in Update) to update the plugin.
 
+### Manual installation
+
+1. Clone this repository to your desired location:
+
+    ```bash
+    git clone https://github.com/kristijan/tmux-flash-copy.git ~/.tmux/plugins/tmux-flash-copy
+    ```
+
+2. Add the following to your `~/.tmux.conf`:
+
+    ```bash
+    run-shell ~/.tmux/plugins/tmux-flash-copy/tmux-flash-copy.tmux
+    ```
+
+3. Reload your tmux configuration:
+
+    ```bash
+    tmux source-file ~/.tmux.conf
+    ```
+
 ## Usage
 
 1. Press the bind key (default: `<tmux_prefix> S-f` (that's `<tmux_prefix> shift+f`)) to activate the search.
@@ -284,18 +304,6 @@ DEFAULT_LABELS = "asdfghjklqwertyuiopzxcvbnmASDFGHJKLQWERTYUIOPZXCVBNM"
 
 The above order are the defaults from [flash.nvim](https://github.com/folke/flash.nvim), but you can arrange them in the order you prefer.
 
-## Clipboard Implementation
-
-For information on clipboard methods, troubleshooting, and platform-specific recommendations, see [CLIPBOARD.md](CLIPBOARD.md).
-
-## Debugging
-
-For information on debugging information, including log format, troubleshooting specific issues, and example debug sessions, see [DEBUGGING.md](DEBUGGING.md).
-
-## Development & Testing
-
-For information on setting up a development environment, running tests, and code quality checks, see [TESTING.md](TESTING.md).
-
 ## ANSI colour codes
 
 Common ANSI colour codes.
@@ -310,10 +318,22 @@ Common ANSI colour codes.
 - `\033[0;31m` - Red (non-bold)
 - `\033[0;32m` - Green (non-bold)
 
+## Clipboard Implementation
+
+For information on clipboard methods, troubleshooting, and platform-specific recommendations, see [CLIPBOARD.md](CLIPBOARD.md).
+
+## Debugging
+
+For information on debugging information, including log format, troubleshooting specific issues, and example debug sessions, see [DEBUGGING.md](DEBUGGING.md).
+
+## Development & Testing
+
+For information on setting up a development environment, running tests, and code quality checks, see [TESTING.md](TESTING.md).
+
 ## Future enhancements
 
 - [ ] I'm manually parsing the output of `tmux` commands using a subprocess. This should ideally be using something like [libtmux](https://github.com/tmux-python/libtmux). I might consider switching to this in a major revision update, as I'm likely leaving increased performance on the table.
-- [ ] Initially I tried getting this to work using the terminal and tmux's alternate screen functionality, but could come to a solution that didn't involve using `send-keys` to enable alternate screen. Using an alternate screen could do away with other ui-modes, and not worry about popup placement, etc...
+- [ ] Initially I tried getting this to work using the terminal and tmux's alternate screen functionality, but could come to a solution that didn't involve using `send-keys` to enable alternate screen. Using an alternate screen could do away with other ui-modes, and not having to worry about popup placement, etc...
 
 ## Contributing
 
@@ -326,10 +346,10 @@ Before submitting a PR:
 3. Add tests for new functionality.
 4. Update documentation as needed.
 
-## License
-
-See LICENSE file for details.
-
 ## Inspiration
 
 This plugin is inspired by the excellent [flash.nvim](https://github.com/folke/flash.nvim) plugin for Neovim, adapted for the tmux ecosystem.
+
+## Other plugins
+
+Check my other plugin  [tmux-fzf-pane-switch](https://github.com/Kristijan/tmux-fzf-pane-switch), that allows you to switch to any pane, in any session, by searching and filtering using fzf.
