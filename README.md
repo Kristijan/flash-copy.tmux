@@ -1,5 +1,7 @@
 # ⚡📋 tmux-flash-copy
 
+[![Plugin Testing](https://github.com/Kristijan/tmux-flash-copy/actions/workflows/plugin-testing.yml/badge.svg)](https://github.com/Kristijan/tmux-flash-copy/actions/workflows/plugin-testing.yml) [![codecov](https://codecov.io/gh/Kristijan/tmux-flash-copy/graph/badge.svg?token=2JVYOAK3SR)](https://codecov.io/gh/Kristijan/tmux-flash-copy) [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+
 A tmux plugin inspired by [flash.nvim](https://github.com/folke/flash.nvim) that enables you to search visible words in the current tmux pane, then copy that word to the system clipboard by pressing the associated label key.
 
 ![Demonstration of tmux-flash-copy in action](assets/tmux-flash-copy-demo.gif)
