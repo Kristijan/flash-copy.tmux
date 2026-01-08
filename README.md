@@ -110,8 +110,8 @@ A tmux plugin inspired by [flash.nvim](https://github.com/folke/flash.nvim) that
 
 By default, selecting a label will copy the text to the clipboard only. If auto-paste is enabled (the default), you can also paste the text automatically:
 
-1. Press `;` (semicolon) (or `Shift+;` (colon) for uppercase labels) to activate the auto-paste modifier
-2. Then press the label key to paste a speific word, or `Enter` to paste the first match
+1. Hold `;` (semicolon) (or `Shift+;` (colon) for uppercase labels) to activate the auto-paste modifier
+2. Then press the label key to paste a specific word, or `Enter` to paste the first match
 
 The selected text will be copied to the clipboard AND automatically pasted into your pane.
 
