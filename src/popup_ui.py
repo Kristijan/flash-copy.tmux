@@ -5,6 +5,7 @@ This module creates a tmux popup window that displays the pane content
 with a search interface, labels for matches, and handles user input.
 """
 
+import contextlib
 import subprocess
 from pathlib import Path
 from typing import Optional
@@ -99,6 +100,16 @@ class PopupUI:
         plugin_dir = Path(__file__).parent.parent
         interactive_script = plugin_dir / "bin" / "tmux-flash-copy-interactive.py"
 
+        # Write pane content to tmux buffer for child process to read
+        # This avoids redundant pane capture in the interactive script
+        # If buffer write fails, child will fall back to capturing pane
+        with contextlib.suppress(subprocess.SubprocessError, OSError):
+            subprocess.run(
+                ["tmux", "set-buffer", "-b", "__tmux_flash_copy_pane_content__", self.pane_content],
+                check=True,
+                timeout=5,
+            )
+
         # Launch tmux popup with the interactive UI
         # -E: close popup on exit
         # -B: no border for seamless look
@@ -189,9 +200,16 @@ class PopupUI:
                     else:
                         logger.log("Buffer read returned empty string")
 
-                # Clean up the buffer after reading
+                # Clean up the result buffer after reading
                 subprocess.run(
                     ["tmux", "delete-buffer", "-b", "__tmux_flash_copy_result__"],
+                    capture_output=True,
+                    check=False,
+                )
+
+                # Clean up the pane content buffer
+                subprocess.run(
+                    ["tmux", "delete-buffer", "-b", "__tmux_flash_copy_pane_content__"],
                     capture_output=True,
                     check=False,
                 )
@@ -219,8 +237,20 @@ class PopupUI:
         except subprocess.TimeoutExpired:
             if logger.enabled:
                 logger.log("Popup timeout expired")
+            # Clean up pane content buffer
+            subprocess.run(
+                ["tmux", "delete-buffer", "-b", "__tmux_flash_copy_pane_content__"],
+                capture_output=True,
+                check=False,
+            )
             return (None, False)
         except Exception as e:
             if logger.enabled:
                 logger.log(f"Exception in _launch_popup: {e}")
+            # Clean up pane content buffer
+            subprocess.run(
+                ["tmux", "delete-buffer", "-b", "__tmux_flash_copy_pane_content__"],
+                capture_output=True,
+                check=False,
+            )
             return (None, False)

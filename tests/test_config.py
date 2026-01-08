@@ -55,6 +55,58 @@ class TestConfigLoader:
     """Test ConfigLoader functionality."""
 
     @patch("subprocess.run")
+    def test_read_all_global_options_success(self, mock_run):
+        """Test batch reading all global options."""
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = '@flash-copy-debug off\n@flash-copy-prompt-colour "\\033[1m"\n'
+        mock_run.return_value = mock_result
+
+        result = ConfigLoader._read_all_global_options()
+
+        assert "@flash-copy-debug" in result
+        assert result["@flash-copy-debug"] == "off"
+        assert "@flash-copy-prompt-colour" in result
+        assert result["@flash-copy-prompt-colour"] == "\033[1m"
+
+    @patch("subprocess.run")
+    def test_read_all_global_options_failure(self, mock_run):
+        """Test batch reading global options with failure."""
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        mock_run.return_value = mock_result
+
+        result = ConfigLoader._read_all_global_options()
+
+        assert result == {}
+
+    @patch("subprocess.run")
+    def test_read_all_window_options_success(self, mock_run):
+        """Test batch reading all window options."""
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = 'mode-keys vi\nword-separators " -"\n'
+        mock_run.return_value = mock_result
+
+        result = ConfigLoader._read_all_window_options()
+
+        assert "mode-keys" in result
+        assert result["mode-keys"] == "vi"
+        assert "word-separators" in result
+        assert result["word-separators"] == " -"
+
+    @patch("subprocess.run")
+    def test_read_all_window_options_failure(self, mock_run):
+        """Test batch reading window options with failure."""
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        mock_run.return_value = mock_result
+
+        result = ConfigLoader._read_all_window_options()
+
+        assert result == {}
+
+    @patch("subprocess.run")
     def test_read_tmux_option_success(self, mock_run):
         """Test reading tmux option successfully."""
         mock_result = MagicMock()
@@ -345,15 +397,54 @@ class TestConfigLoader:
 
         assert result == "default"
 
+    @patch("src.config.ConfigLoader._read_tmux_window_option")
+    @patch("src.config.ConfigLoader._read_tmux_option")
+    def test_get_word_separators_invalid_escape_sequence(self, mock_read_option, mock_read_window):
+        """Test handling of invalid escape sequences in word-separators."""
+        mock_read_option.return_value = ""
+        # Invalid escape sequence that causes ast.literal_eval to fail
+        mock_read_window.return_value = 'word-separators "\\x999"'
+
+        result = ConfigLoader.get_word_separators()
+
+        # Should fall back to extracting between quotes without decoding
+        # The string is extracted as-is: \x999
+        assert result == "\x999"
+
+    @patch("src.config.ConfigLoader._read_tmux_window_option")
+    @patch("src.config.ConfigLoader._read_tmux_option")
+    def test_get_word_separators_syntax_error(self, mock_read_option, mock_read_window):
+        """Test handling of syntax errors in word-separators."""
+        mock_read_option.return_value = ""
+        # Unclosed quote that causes SyntaxError
+        mock_read_window.return_value = 'word-separators "invalid\\""'
+
+        result = ConfigLoader.get_word_separators()
+
+        # Should fall back to extracting between quotes
+        # The backslash-quote becomes just a quote: invalid"
+        assert result == 'invalid"'
+
+    @patch("src.config.ConfigLoader._read_all_window_options")
+    @patch("src.config.ConfigLoader._read_all_global_options")
     @patch("src.config.ConfigLoader.get_int")
     @patch("src.config.ConfigLoader.get_choice")
     @patch("src.config.ConfigLoader.get_bool")
     @patch("src.config.ConfigLoader.get_string")
     @patch("src.config.ConfigLoader.get_word_separators")
     def test_load_all_flash_copy_config(
-        self, mock_word_sep, mock_string, mock_bool, mock_choice, mock_int
+        self,
+        mock_word_sep,
+        mock_string,
+        mock_bool,
+        mock_choice,
+        mock_int,
+        mock_global_opts,
+        mock_window_opts,
     ):
         """Test loading all flash-copy configuration."""
+        mock_global_opts.return_value = {}
+        mock_window_opts.return_value = {}
         mock_choice.side_effect = ["bottom"]
         mock_bool.side_effect = [True, False, False, True]  # auto_paste_enable defaults to True
         mock_word_sep.return_value = None
@@ -384,15 +475,26 @@ class TestConfigLoader:
         assert config.idle_timeout == 15
         assert config.idle_warning == 5
 
+    @patch("src.config.ConfigLoader._read_all_window_options")
+    @patch("src.config.ConfigLoader._read_all_global_options")
     @patch("src.config.ConfigLoader.get_int")
     @patch("src.config.ConfigLoader.get_choice")
     @patch("src.config.ConfigLoader.get_bool")
     @patch("src.config.ConfigLoader.get_string")
     @patch("src.config.ConfigLoader.get_word_separators")
     def test_load_all_flash_copy_config_auto_paste_disabled(
-        self, mock_word_sep, mock_string, mock_bool, mock_choice, mock_int
+        self,
+        mock_word_sep,
+        mock_string,
+        mock_bool,
+        mock_choice,
+        mock_int,
+        mock_global_opts,
+        mock_window_opts,
     ):
         """Test loading flash-copy configuration with auto-paste disabled."""
+        mock_global_opts.return_value = {}
+        mock_window_opts.return_value = {}
         mock_choice.side_effect = ["top"]
         mock_bool.side_effect = [True, True, True, False]  # auto_paste_enable is False
         mock_word_sep.return_value = " -"

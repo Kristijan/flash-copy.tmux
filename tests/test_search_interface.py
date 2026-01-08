@@ -140,14 +140,13 @@ class TestSearchInterface:
 
         matches = search.search("bar")
 
-        # With " -" as separators, underscores are not separators
-        # so "foo_bar" is one word
-        # Note: "-bar" has leading dash separator, "foo_bar" has no leading separator (space before it)
+        # With " -" as separators, we match non-whitespace sequences
+        # and extract words based on separators for copying
         assert len(matches) == 2
-        assert any(m.text == "-bar" for m in matches)  # "bar" with leading dash separator
-        assert any(m.text == "foo_bar" for m in matches)
-        # Verify that copy_text strips the separator
-        assert any(m.copy_text == "bar" for m in matches)
+        # Match 1: sequence "foo-bar", copy_text "bar" (dash is separator)
+        assert any(m.text == "foo-bar" and m.copy_text == "bar" for m in matches)
+        # Match 2: sequence "foo_bar", copy_text "foo_bar" (underscore not a separator)
+        assert any(m.text == "foo_bar" and m.copy_text == "foo_bar" for m in matches)
 
     def test_search_reverse_order(self):
         """Test search with reverse ordering (bottom to top)."""
