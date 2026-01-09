@@ -87,10 +87,10 @@ This serves as a visual reminder that debug logging is enabled.
 
 To prevent the popup from blocking indefinitely if left open, tmux-flash-copy includes an **automatic idle timeout**:
 
-### Behavior
+### Behaviour
 
 - **Timeout duration**: 15 seconds of inactivity (configurable via `@flash-copy-idle-timeout`)
-- **Warning**: Appears 5 seconds before timeout (at 10 seconds elapsed), showing countdown (configurable via `@flash-copy-idle-warning`)
+- **Warning**: Appears 5 seconds before timeout (at 10 seconds elapsed, configurable via `@flash-copy-idle-warning`)
 - **Auto-exit**: At 15 seconds, the popup closes automatically (same as pressing ESC)
 
 The `@flash-copy-idle-warning` value specifies how many seconds BEFORE the timeout the warning should appear. For example, with the default settings (timeout=15, warning=5), the warning appears at 10 seconds elapsed (15 - 5 = 10).
@@ -101,7 +101,7 @@ When the warning appears, you'll see a yellow countdown message:
 
 ```text
 ───────────────────────────────────────────────────
-> search...              Idle, terminating in 7s...
+> search...              Idle, terminating in 5s...
 ```
 
 The warning takes priority over the debug indicator when both would be displayed.
@@ -141,11 +141,10 @@ You can always exit before the timeout by:
 - Pressing **ESC** to cancel
 - Pressing **Ctrl+C** to cancel
 - Selecting text with a label key
-- Closing the tmux pane
 
 ### Configuration
 
-The idle timeout behavior can be customized via tmux configuration options:
+The idle timeout behaviour can be customized via tmux configuration options:
 
 ```bash
 # Set idle timeout to 30 seconds (default: 15)

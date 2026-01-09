@@ -6,7 +6,7 @@ This document explains how tmux-flash-copy handles clipboard operations across d
 
 - [Overview](#overview)
 - [Clipboard Methods (Priority Order)](#clipboard-methods-priority-order)
-- [Internal: IPC buffer](#internal-ipc-buffer)
+- [Internal IPC buffer](#internal-ipc-buffer)
   - [1. OSC52 via tmux (Primary Method)](#1-osc52-via-tmux-primary-method)
   - [2. Native System Clipboard Tools (Fallback)](#2-native-system-clipboard-tools-fallback)
   - [3. tmux Buffer (Last Resort)](#3-tmux-buffer-last-resort)
@@ -134,7 +134,7 @@ When OSC52 fails, the plugin falls back to platform-specific clipboard utilities
 - Cannot paste into other applications
 - Does not persist across tmux sessions
 
-## Internal: IPC buffer
+## Internal IPC buffer
 
 ### The `__tmux_flash_copy_result__%X__` buffer
 
