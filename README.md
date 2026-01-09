@@ -174,7 +174,7 @@ Customise the characters that define word boundaries.
 Priority order.
 
   1. **First**: Check @flash-copy-word-separators (custom user override)
-  2. **Fallback**: Read tmux's built-in word-separators window option (can be overriden in `~/.tmux.conf`)
+  2. **Fallback**: Read tmux's built-in word-separators window option (can be overridden in `~/.tmux.conf`)
 
 This allows you to control what constitutes a "word" for the plugin. This is particularly useful when working with configuration strings like `#{@variable_name}` where you want `@` and `}` to be word boundaries.
 
@@ -396,7 +396,7 @@ For information on setting up a development environment, running tests, and code
 ## Future enhancements
 
 - [ ] I'm manually parsing the output of `tmux` commands using a subprocess. This should ideally be using something like [libtmux](https://github.com/tmux-python/libtmux). I might consider switching to this in a major revision update, as I'm likely leaving increased performance on the table.
-- [ ] Initially I tried getting this to work using the terminal and tmux's alternate screen functionality, but could come to a solution that didn't involve using `send-keys` to enable alternate screen. Using an alternate screen could potentially simplify the popup placement logic.
+- [ ] Initially I tried getting this to work using the terminal alternate screen functionality, but couldn't come to a solution that didn't involve using `send-keys` to enable alternate screen. Using an alternate screen could potentially simplify the popup placement logic.
 
 ## Demonstration
 
@@ -431,4 +431,4 @@ This plugin is inspired by the excellent [flash.nvim](https://github.com/folke/f
 
 ## Other plugins
 
-Check my other plugin  [tmux-fzf-pane-switch](https://github.com/Kristijan/tmux-fzf-pane-switch), that allows you to switch to any pane, in any session, by searching and filtering using fzf.
+Check my other plugin [tmux-fzf-pane-switch](https://github.com/Kristijan/tmux-fzf-pane-switch), that allows you to switch to any pane, in any session, by searching and filtering using fzf.

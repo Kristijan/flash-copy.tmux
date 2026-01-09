@@ -80,20 +80,23 @@ source .venv/bin/activate
 Install dependencies:
 
 ```bash
-uv pip install -e ".[dev]"
+uv sync --locked --all-extras --dev
 ```
 
 This installs:
 
 - The `tmux-flash-copy` package in editable mode
-- Test dependencies: `pytest`, `pytest-cov`
-- All other development tools
+- Test dependencies:
+  - `pytest-cov`
+  - `pytest`
+  - `ruff`
+  - `ty`
 
 ### 5. Verify Installation
 
 ```bash
 # Check that pytest is available
-pytest --version
+uv run pytest --version
 
 # Check Python can import the package
 python -c "from src.clipboard import Clipboard; print('Success!')"
@@ -104,7 +107,10 @@ python -c "from src.clipboard import Clipboard; print('Success!')"
 ### Run All Tests
 
 ```bash
-pytest
+uv run ty check
+uv run ruff check
+uv run ruff format --check
+uv run pytest
 ```
 
 **Output**:
@@ -112,7 +118,7 @@ pytest
 ```text
 ============================= test session starts ==============================
 ...
-152 passed in 3.32s
+235 passed in 3.79s
 ```
 
 Shows each test name as it runs.
@@ -121,7 +127,7 @@ Shows each test name as it runs.
 
 ```bash
 # Terminal report
-pytest --cov=src --cov-report=term-missing
+uv run pytest --cov=src --cov-report=term-missing
 ```
 
 The resulting HTML reports will be in a directory named `htmlcov/`
@@ -145,25 +151,25 @@ TOTAL                       673    299    56%
 
 ```bash
 # Run only clipboard tests
-pytest tests/test_clipboard.py
+uv run pytest tests/test_clipboard.py
 ```
 
 ### Run Specific Test Classes
 
 ```bash
 # Run all tests in TestClipboard class
-pytest tests/test_clipboard.py::TestClipboard -v
+uv run pytest tests/test_clipboard.py::TestClipboard -v
 ```
 
 ### Run Specific Test Functions
 
 ```bash
 # Run a single test
-pytest tests/test_clipboard.py::TestClipboard::test_copy_success_with_osc52 -v
+uv run pytest tests/test_clipboard.py::TestClipboard::test_copy_success_with_osc52 -v
 
 # Run multiple specific tests
-pytest tests/test_clipboard.py::TestClipboard::test_copy_success_with_osc52 \
-       tests/test_clipboard.py::TestClipboard::test_copy_fallback_to_pbcopy_on_macos -v
+uv run pytest tests/test_clipboard.py::TestClipboard::test_copy_success_with_osc52 \
+              tests/test_clipboard.py::TestClipboard::test_copy_fallback_to_pbcopy_on_macos -v
 ```
 
 ## Code Quality Checks
@@ -173,36 +179,106 @@ The following tools are used to ensure code quality:
 ### 1. Type Checking with `ty`
 
 ```bash
-uvx ty check
+uv run ty check
 ```
 
 ### 2. Linting with `ruff`
 
 ```bash
-uvx ruff check
+uv run ruff check
 ```
 
 ### 3. Formatting with `ruff`
 
 ```bash
-uvx ruff format --check
+uv run ruff format --check
 ```
 
 ## Test Structure
 
-### Test Organization
+### Test Organisation
 
 ```text
 tests/
 ├── __init__.py                 # Package marker
 ├── conftest.py                 # Shared fixtures
-├── test_ansi_utils.py          # ANSI utilities
-├── test_clipboard.py           # Clipboard operations
-├── test_config.py              # Configuration loading
-├── test_pane_capture.py        # Pane capture
-├── test_search_interface.py    # Search & labeling
-└── test_utils.py               # Utility functions
+├── test_ansi_utils.py          # ANSI utilities (TestAnsiStyles, TestTerminalSequences, TestControlChars, TestAnsiUtils)
+├── test_auto_paste.py          # Auto-paste functionality (TestAutoPasteConfiguration, TestAutoPasteInteractiveUI, TestAutoPasteDebugLogging, etc.)
+├── test_clipboard.py           # Clipboard operations (TestClipboard)
+├── test_config.py              # Configuration loading (TestFlashCopyConfig, TestConfigLoader)
+├── test_debug_logger.py        # Debug logging functionality
+├── test_idle_timeout.py        # Idle timeout behavior (TestIdleTimeoutWarning, TestIdleTimeoutExit, TestIdleTimeoutWarningValidation, etc.)
+├── test_label_placement.py     # Label placement rendering logic
+├── test_pane_capture.py        # Pane capture (TestPaneCapture)
+├── test_popup_ui.py            # Popup UI functionality (TestPopupUIAutoPaste, TestPopupUIErrorHandling)
+├── test_search_interface.py    # Search & labeling (TestSearchMatch, TestSearchInterface)
+└── test_utils.py               # Utility functions (TestSubprocessUtils, TestPaneDimensions, TestTmuxPaneUtils)
 ```
+
+### Test Files Overview
+
+#### `test_ansi_utils.py`
+Tests for ANSI escape sequence handling and utilities:
+- **TestAnsiStyles**: ANSI style constants (BOLD, DIM, RESET)
+- **TestTerminalSequences**: Terminal sequence constants (CLEAR_SCREEN)
+- **TestControlChars**: Control character constants (CTRL_C, ESC, BACKSPACE, ENTER, etc.)
+- **TestAnsiUtils**: Strip ANSI codes, visible length calculation, position mapping
+
+#### `test_auto_paste.py`
+Tests for auto-paste functionality that allows pasting selected text directly:
+- **TestAutoPasteConfiguration**: Configuration defaults and settings
+- **TestAutoPasteInteractiveUI**: Semicolon/colon modifier behavior
+- **TestAutoPasteDebugLogging**: Debug logging for modifier state changes
+- **TestAutoPasteSemicolonColon**: Semicolon and colon key handling
+- **TestAutoPasteWithMatches**: Auto-paste with search results
+- **TestAutoPastePopupUIIntegration**: Flag passing to subprocess
+- **TestAutoPasteEdgeCases**: Edge cases and boundary conditions
+
+#### `test_clipboard.py`
+Tests for clipboard operations with OSC52 and fallback mechanisms:
+- **TestClipboard**: OSC52 copying, pbcopy/xclip fallbacks, error handling
+
+#### `test_config.py`
+Tests for configuration loading from tmux options:
+- **TestFlashCopyConfig**: Default values, color settings, boolean options
+- **TestConfigLoader**: Loading from tmux options, parsing values
+
+#### `test_debug_logger.py`
+Tests for debug logging system (enabled via `@flash-copy-debug`).
+
+#### `test_idle_timeout.py`
+Tests for idle timeout functionality that auto-exits after inactivity:
+- **TestIdleTimeoutWarning**: Warning display after threshold
+- **TestIdleTimeoutExit**: Exit behavior after timeout
+- **TestIdleTimeoutWarningValidation**: Warning validation logic
+- **TestIdleTimeoutReset**: Timeout reset on user input
+- **TestIdleTimeoutConstants**: Default timeout values
+- **TestIdleTimeoutDebugLogging**: Debug logging for timeout events
+
+#### `test_label_placement.py`
+Tests for label placement rendering logic:
+- Partial match label placement (replaces next character)
+- Whole word match label placement (replaces following space)
+
+#### `test_pane_capture.py`
+Tests for capturing tmux pane content:
+- **TestPaneCapture**: Pane content capture via `tmux capture-pane`
+
+#### `test_popup_ui.py`
+Tests for tmux popup/window UI management:
+- **TestPopupUIAutoPaste**: Auto-paste flag handling in popup
+- **TestPopupUIErrorHandling**: Error handling and cleanup
+
+#### `test_search_interface.py`
+Tests for search and label assignment logic:
+- **TestSearchMatch**: Search match data structure
+- **TestSearchInterface**: Word matching, label generation, dynamic search updates
+
+#### `test_utils.py`
+Tests for utility functions and tmux integration:
+- **TestSubprocessUtils**: Subprocess command execution with timeouts
+- **TestPaneDimensions**: Pane dimension parsing
+- **TestTmuxPaneUtils**: Tmux pane information retrieval
 
 ## Continuous Integration (CI)
 
@@ -241,19 +317,6 @@ uv run ruff format
 uv run pytest
 
 # If all pass, your PR is ready!
-```
-
-### Test Timeouts
-
-Some tests use subprocess timeouts:
-
-```python
-# Increase timeout if needed
-result = SubprocessUtils.run_command(
-    ["sleep", "10"],
-    default="timeout",
-    timeout=5  # Increase this value
-)
 ```
 
 ## Related Documentation
