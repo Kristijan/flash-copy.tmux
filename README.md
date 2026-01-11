@@ -1,18 +1,17 @@
 <h1 align="center">
     ⚡📋 TMUX Flash Copy
+    <div align="center">
+        <a href="https://github.com/Kristijan/flash-copy.tmux/actions/workflows/plugin-testing.yml">
+            <img src="https://github.com/Kristijan/flash-copy.tmux/actions/workflows/plugin-testing.yml/badge.svg"/>
+        </a>
+        <a href="https://codecov.io/gh/Kristijan/flash-copy.tmux">
+            <img src="https://codecov.io/gh/Kristijan/flash-copy.tmux/graph/badge.svg?token=2JVYOAK3SR"/> 
+        </a>
+        <a href="https://www.gnu.org/licenses/gpl-3.0">
+            <img src="https://img.shields.io/badge/License-GPLv3-blue.svg"/>
+        </a>
+    </div>
 </h1>
-
-<div align="center">
-    <a href="https://github.com/Kristijan/flash-copy.tmux/actions/workflows/plugin-testing.yml">
-        <img src="https://github.com/Kristijan/flash-copy.tmux/actions/workflows/plugin-testing.yml/badge.svg"/>
-    </a>
-    <a href="https://codecov.io/gh/Kristijan/flash-copy.tmux">
-        <img src="https://codecov.io/gh/Kristijan/flash-copy.tmux/graph/badge.svg?token=2JVYOAK3SR"/> 
-    </a>
-    <a href="https://www.gnu.org/licenses/gpl-3.0">
-        <img src="https://img.shields.io/badge/License-GPLv3-blue.svg"/>
-    </a>
-</div>
 
 A tmux plugin inspired by [flash.nvim](https://github.com/folke/flash.nvim) that enables you to search visible words in the current tmux pane, then copy that word to the system clipboard by pressing the associated label key.
 
