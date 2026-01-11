@@ -442,4 +442,4 @@ This plugin is inspired by the excellent [flash.nvim](https://github.com/folke/f
 
 ## Other plugins
 
-Check my other plugin [tmux-fzf-pane-switch](https://github.com/Kristijan/tmux-fzf-pane-switch), that allows you to switch to any pane, in any session, by searching and filtering using fzf.
+Check out my other plugin [TMUX FZF Pane Switch](https://github.com/Kristijan/flash-copy.tmux), that allows you to switch to any pane, in any session, by searching and filtering using fzf.
