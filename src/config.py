@@ -7,7 +7,7 @@ with consistent error handling and type conversion.
 
 import ast
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 
@@ -29,6 +29,27 @@ class FlashCopyConfig:
     label_characters: Optional[str] = None
     idle_timeout: int = 15
     idle_warning: int = 5
+    range_selection_enable: bool = True
+    range_selection_key: str = ","
+    range_copy_mode: str = "word"
+    range_marker_fg_colour: str = "\033[30m"
+    range_marker_bg_colour: str = "\033[45m"
+    range_selection_key_fell_back: bool = field(init=False, default=False, repr=False)
+
+    def __post_init__(self):
+        """Validate configuration that depends on multiple option values."""
+        self.range_copy_mode = self.range_copy_mode.lower()
+        if self.range_copy_mode not in ("word", "precise"):
+            self.range_copy_mode = "word"
+
+        key_is_valid = len(self.range_selection_key) == 1 and self.range_selection_key.isprintable()
+        conflicts_with_auto_paste = self.auto_paste_enable and self.range_selection_key in (
+            ";",
+            ":",
+        )
+        if not key_is_valid or conflicts_with_auto_paste:
+            self.range_selection_key = ","
+            self.range_selection_key_fell_back = True
 
 
 class ConfigLoader:
@@ -72,6 +93,9 @@ class ConfigLoader:
                                 except (ValueError, SyntaxError):
                                     # Fallback: just strip quotes without decoding
                                     value = value[1:-1]
+                            else:
+                                # tmux doubles literal backslashes in unquoted show-options output.
+                                value = value.replace("\\\\", "\\")
                             options[key] = value
         except (subprocess.SubprocessError, OSError):
             pass
@@ -417,4 +441,21 @@ class ConfigLoader:
             label_characters=ConfigLoader.get_optional_string("@flash-copy-label-characters"),
             idle_timeout=ConfigLoader.get_int("@flash-copy-idle-timeout", default=15),
             idle_warning=ConfigLoader.get_int("@flash-copy-idle-warning", default=5),
+            range_selection_enable=ConfigLoader.get_bool(
+                "@flash-copy-range-selection", default=True
+            ),
+            range_selection_key=ConfigLoader.get_string(
+                "@flash-copy-range-selection-key", default=","
+            ),
+            range_copy_mode=ConfigLoader.get_choice(
+                "@flash-copy-range-copy-mode",
+                choices=["word", "precise"],
+                default="word",
+            ),
+            range_marker_fg_colour=ConfigLoader.get_string(
+                "@flash-copy-range-marker-fg-colour", default="\033[30m"
+            ),
+            range_marker_bg_colour=ConfigLoader.get_string(
+                "@flash-copy-range-marker-bg-colour", default="\033[45m"
+            ),
         )

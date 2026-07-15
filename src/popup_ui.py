@@ -162,6 +162,16 @@ class PopupUI:
             str(self.config.idle_timeout),
             "--idle-warning",
             str(self.config.idle_warning),
+            "--range-selection",
+            "true" if self.config.range_selection_enable else "false",
+            "--range-selection-key",
+            self.config.range_selection_key,
+            "--range-copy-mode",
+            self.config.range_copy_mode,
+            "--range-marker-fg-colour",
+            self.config.range_marker_fg_colour,
+            "--range-marker-bg-colour",
+            self.config.range_marker_bg_colour,
         ]
 
         logger = DebugLogger.get_instance()
@@ -190,12 +200,12 @@ class PopupUI:
                     logger.log("Reading result from tmux buffer...")
 
                 buffer_result = subprocess.run(
-                    ["tmux", "show-buffer", "-b", result_buffer],
+                    ["tmux", "save-buffer", "-b", result_buffer, "-"],
                     capture_output=True,
                     text=True,
                     check=True,
                 )
-                result_text = buffer_result.stdout.strip() if buffer_result.stdout else None
+                result_text = buffer_result.stdout if buffer_result.stdout is not None else None
 
                 if logger.enabled:
                     if result_text:

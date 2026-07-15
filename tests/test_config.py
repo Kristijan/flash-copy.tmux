@@ -22,6 +22,12 @@ class TestFlashCopyConfig:
         assert config.prompt_colour == "\033[1m"
         assert config.debug_enabled is False
         assert config.auto_paste_enable is True
+        assert config.range_selection_enable is True
+        assert config.range_selection_key == ","
+        assert config.range_copy_mode == "word"
+        assert config.range_marker_fg_colour == "\033[30m"
+        assert config.range_marker_bg_colour == "\033[45m"
+        assert config.range_selection_key_fell_back is False
 
     def test_custom_values(self):
         """Test configuration with custom values."""
@@ -50,6 +56,29 @@ class TestFlashCopyConfig:
         assert config.debug_enabled is True
         assert config.auto_paste_enable is False
 
+    def test_invalid_range_selection_key_falls_back_to_comma(self):
+        config = FlashCopyConfig(range_selection_key="too long")
+
+        assert config.range_selection_key == ","
+        assert config.range_selection_key_fell_back is True
+
+    def test_range_selection_key_conflicting_with_auto_paste_falls_back(self):
+        config = FlashCopyConfig(range_selection_key=";")
+
+        assert config.range_selection_key == ","
+        assert config.range_selection_key_fell_back is True
+
+    def test_semicolon_range_key_is_valid_when_auto_paste_is_disabled(self):
+        config = FlashCopyConfig(auto_paste_enable=False, range_selection_key=";")
+
+        assert config.range_selection_key == ";"
+        assert config.range_selection_key_fell_back is False
+
+    def test_invalid_range_copy_mode_falls_back_to_word(self):
+        config = FlashCopyConfig(range_copy_mode="invalid")
+
+        assert config.range_copy_mode == "word"
+
 
 class TestConfigLoader:
     """Test ConfigLoader functionality."""
@@ -68,6 +97,18 @@ class TestConfigLoader:
         assert result["@flash-copy-debug"] == "off"
         assert "@flash-copy-prompt-colour" in result
         assert result["@flash-copy-prompt-colour"] == "\033[1m"
+
+    @patch("subprocess.run")
+    def test_read_all_global_options_decodes_unquoted_backslash(self, mock_run):
+        """Decode the escaped form tmux uses for an unquoted literal backslash."""
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = r"@flash-copy-range-selection-key \\" + "\n"
+        mock_run.return_value = mock_result
+
+        result = ConfigLoader._read_all_global_options()
+
+        assert result["@flash-copy-range-selection-key"] == "\\"
 
     @patch("subprocess.run")
     def test_read_all_global_options_failure(self, mock_run):
@@ -573,8 +614,8 @@ class TestConfigLoader:
         """Test loading all flash-copy configuration."""
         mock_global_opts.return_value = {}
         mock_window_opts.return_value = {}
-        mock_choice.side_effect = ["bottom"]
-        mock_bool.side_effect = [True, False, False, True]  # auto_paste_enable defaults to True
+        mock_choice.side_effect = ["bottom", "word"]
+        mock_bool.side_effect = [True, False, False, True, True]
         mock_word_sep.return_value = None
         mock_string.side_effect = [
             "search...",
@@ -583,6 +624,9 @@ class TestConfigLoader:
             ">",
             "\033[1m",
             "",
+            ",",
+            "\033[31m",
+            "\033[46m",
         ]
         mock_int.side_effect = [15, 5]  # idle_timeout, idle_warning
 
@@ -602,6 +646,11 @@ class TestConfigLoader:
         assert config.auto_paste_enable is True
         assert config.idle_timeout == 15
         assert config.idle_warning == 5
+        assert config.range_selection_enable is True
+        assert config.range_selection_key == ","
+        assert config.range_copy_mode == "word"
+        assert config.range_marker_fg_colour == "\033[31m"
+        assert config.range_marker_bg_colour == "\033[46m"
 
     @patch("src.config.ConfigLoader._read_all_window_options")
     @patch("src.config.ConfigLoader._read_all_global_options")
@@ -623,8 +672,8 @@ class TestConfigLoader:
         """Test loading flash-copy configuration with auto-paste disabled."""
         mock_global_opts.return_value = {}
         mock_window_opts.return_value = {}
-        mock_choice.side_effect = ["top"]
-        mock_bool.side_effect = [True, True, True, False]  # auto_paste_enable is False
+        mock_choice.side_effect = ["top", "precise"]
+        mock_bool.side_effect = [True, True, True, False, True]
         mock_word_sep.return_value = " -"
         mock_string.side_effect = [
             "search...",
@@ -633,6 +682,9 @@ class TestConfigLoader:
             ">",
             "\033[1m",
             "",
+            ",",
+            "\033[30m",
+            "\033[45m",
         ]
         mock_int.side_effect = [30, 10]  # custom idle_timeout, idle_warning
 
@@ -641,3 +693,4 @@ class TestConfigLoader:
         assert config.auto_paste_enable is False
         assert config.idle_timeout == 30
         assert config.idle_warning == 10
+        assert config.range_copy_mode == "precise"

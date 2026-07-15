@@ -144,9 +144,15 @@ class TestSearchInterface:
         # and extract words based on separators for copying
         assert len(matches) == 2
         # Match 1: sequence "foo-bar", copy_text "bar" (dash is separator)
-        assert any(m.text == "foo-bar" and m.copy_text == "bar" for m in matches)
+        separated_match = next(m for m in matches if m.text == "foo-bar")
+        assert separated_match.copy_text == "bar"
+        assert separated_match.copy_start_pos == 4
+        assert separated_match.copy_end_pos == 7
         # Match 2: sequence "foo_bar", copy_text "foo_bar" (underscore not a separator)
-        assert any(m.text == "foo_bar" and m.copy_text == "foo_bar" for m in matches)
+        unseparated_match = next(m for m in matches if m.text == "foo_bar")
+        assert unseparated_match.copy_text == "foo_bar"
+        assert unseparated_match.copy_start_pos == 8
+        assert unseparated_match.copy_end_pos == 15
 
     def test_search_reverse_order(self):
         """Test search with reverse ordering (bottom to top)."""

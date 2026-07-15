@@ -76,6 +76,8 @@ def main():
 
             # Log all configuration
             logger.log_section("Configuration Settings")
+            if config.range_selection_key_fell_back:
+                logger.log("Invalid range selection key; falling back to ','")
             logger.log_dict(
                 {
                     "reverse_search": config.reverse_search,
@@ -90,6 +92,11 @@ def main():
                     "label_colour": repr(config.label_colour),
                     "prompt_colour": repr(config.prompt_colour),
                     "debug_enabled": config.debug_enabled,
+                    "range_selection_enable": config.range_selection_enable,
+                    "range_selection_key": config.range_selection_key,
+                    "range_copy_mode": config.range_copy_mode,
+                    "range_marker_fg_colour": repr(config.range_marker_fg_colour),
+                    "range_marker_bg_colour": repr(config.range_marker_bg_colour),
                 }
             )
 
