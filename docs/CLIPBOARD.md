@@ -1,35 +1,35 @@
-# Clipboard Implementation
+# Clipboard implementation
 
 This document explains how tmux-flash-copy handles clipboard operations across different platforms and terminal configurations.
 
-## Table of Contents
+## Table of contents
 
 - [Overview](#overview)
-- [Clipboard Methods (Priority Order)](#clipboard-methods-priority-order)
+- [Clipboard methods](#clipboard-methods)
+  - [1. OSC52 via tmux](#1-osc52-via-tmux)
+  - [2. Native system clipboard tools](#2-native-system-clipboard-tools)
+  - [3. tmux buffer](#3-tmux-buffer)
 - [Internal IPC buffer](#internal-ipc-buffer)
-  - [1. OSC52 via tmux (Primary Method)](#1-osc52-via-tmux-primary-method)
-  - [2. Native System Clipboard Tools (Fallback)](#2-native-system-clipboard-tools-fallback)
-  - [3. tmux Buffer (Last Resort)](#3-tmux-buffer-last-resort)
 - [Troubleshooting](#troubleshooting)
-  - [OSC52 Not Working](#osc52-not-working)
-  - [Native Tools Not Working](#native-tools-not-working)
-  - [SSH/Remote Sessions](#sshremote-sessions)
-- [Testing Clipboard](#testing-clipboard)
-- [Related Documentation](#related-documentation)
+  - [OSC52 not working](#osc52-not-working)
+  - [Native tools not working](#native-tools-not-working)
+  - [SSH and remote sessions](#ssh-and-remote-sessions)
+- [Testing the clipboard](#testing-the-clipboard)
+- [Related documentation](#related-documentation)
 
 ## Overview
 
-tmux-flash-copy uses a tiered fallback approach to ensure clipboard functionality works in as many environments as possible. The plugin attempts multiple methods in priority order, stopping at the first successful one.
+tmux-flash-copy tries several clipboard methods in order and stops at the first successful one.
 
-## Clipboard Methods (Priority Order)
+## Clipboard methods
 
-### 1. OSC52 via tmux (Primary Method)
+### 1. OSC52 via tmux
 
 **Command**: `tmux set-buffer -w`
 
 **How it works**:
 
-- Leverages tmux 3.2+'s built-in OSC52 support
+- Uses the built-in OSC52 support available in tmux 3.2 or newer
 - tmux sends an OSC52 escape sequence to the terminal
 - The terminal intercepts the sequence and copies to system clipboard
 - No external tools required
@@ -37,7 +37,7 @@ tmux-flash-copy uses a tiered fallback approach to ensure clipboard functionalit
 **Requirements**:
 
 - tmux 3.2 or newer
-- Terminal with OSC52 support (Ghostty, Kitty, Alacritty, etc...)
+- Terminal with OSC52 support, such as Ghostty, Kitty, or Alacritty
 
 **Benefits**:
 
@@ -50,7 +50,7 @@ tmux-flash-copy uses a tiered fallback approach to ensure clipboard functionalit
 - Requires terminal OSC52 support
 - Some terminals need OSC52 explicitly enabled in their config
 
-### 2. Native System Clipboard Tools (Fallback)
+### 2. Native system clipboard tools
 
 When OSC52 fails, the plugin falls back to platform-specific clipboard utilities.
 
@@ -75,7 +75,7 @@ When OSC52 fails, the plugin falls back to platform-specific clipboard utilities
 
 - Doesn't work over SSH (local only)
 
-#### Linux: `xclip` (Primary)
+#### Linux: `xclip`
 
 **Command**: `xclip -selection clipboard`
 
@@ -95,7 +95,7 @@ When OSC52 fails, the plugin falls back to platform-specific clipboard utilities
 - Doesn't work over SSH without X11 forwarding
 - Must be installed separately
 
-#### Linux: `xsel` (Secondary Fallback)
+#### Linux: `xsel` fallback
 
 **Command**: `xsel --clipboard --input`
 
@@ -109,7 +109,7 @@ When OSC52 fails, the plugin falls back to platform-specific clipboard utilities
 - X11 display server
 - `xsel` package installed
 
-### 3. tmux Buffer (Last Resort)
+### 3. tmux buffer
 
 **Command**: `tmux set-buffer`
 
@@ -117,7 +117,7 @@ When OSC52 fails, the plugin falls back to platform-specific clipboard utilities
 
 - Stores text in tmux's internal buffer
 - Can be pasted within tmux using `tmux paste-buffer`
-- Does NOT copy to system clipboard
+- Does not copy to the system clipboard
 
 **Requirements**:
 
@@ -138,7 +138,7 @@ When OSC52 fails, the plugin falls back to platform-specific clipboard utilities
 
 ### The `__tmux_flash_copy_result__%X__` buffer
 
-The plugin uses a special tmux buffer named `__tmux_flash_copy_result__%X__` (`%X` is the calling pane_id) for internal communication between the parent process and the interactive popup UI.
+The plugin uses a tmux buffer named `__tmux_flash_copy_result__%X__`, where `%X` is the calling pane ID, for communication between the parent process and the interactive popup UI.
 
 **Purpose**: Inter-process communication (IPC)
 
@@ -154,18 +154,18 @@ The plugin uses a special tmux buffer named `__tmux_flash_copy_result__%X__` (`%
 - This buffer is **separate** from clipboard operations
 - It's used only for passing data from the popup to the parent process
 - It exists only briefly (written → read → deleted)
-- The double underscores (`__`) indicate this is an internal/private buffer
+- The double underscores (`__`) identify it as an internal buffer
 - Users will never interact with this buffer directly
 
 **Why a tmux buffer for IPC?**
 
 The plugin runs the interactive UI inside a `tmux display-popup`, which creates a pseudo-terminal. Standard output from the popup process cannot be captured by the parent, so we use a tmux buffer as a temporary storage mechanism.
 
-After the text is read from the IPC buffer, it's copied to the system clipboard using the standard clipboard methods described above (OSC52, pbcopy, xclip, etc.).
+After reading the text from the IPC buffer, the parent copies it using one of the clipboard methods described above.
 
 ## Troubleshooting
 
-### OSC52 Not Working
+### OSC52 not working
 
 **Check tmux version**:
 
@@ -176,7 +176,7 @@ tmux -V
 
 **Check terminal OSC52 support**:
 
-Some terminals require OSC52 to be enabled in their configuration. Check your respective terminal documentation.
+Some terminals require OSC52 to be enabled in their configuration. Consult your terminal's documentation.
 
 **Test OSC52 manually**:
 
@@ -185,7 +185,7 @@ Some terminals require OSC52 to be enabled in their configuration. Check your re
 printf "\033]52;c;$(printf 'test' | base64)\007"
 ```
 
-### Native Tools Not Working
+### Native tools not working
 
 **Check if tools are installed**:
 
@@ -198,15 +198,15 @@ which xclip
 which xsel
 ```
 
-### SSH/Remote Sessions
+### SSH and remote sessions
 
-**Best option**: Use OSC52
+**Recommended option**: Use OSC52
 
 - Works transparently over SSH
 - No X11 forwarding needed
 - Terminal handles clipboard on local machine
 
-**Alternative**: X11 Forwarding
+**Alternative**: X11 forwarding
 
 ```bash
 # SSH with X11 forwarding
@@ -216,9 +216,9 @@ ssh -X user@remote-host
 echo $DISPLAY
 ```
 
-## Testing Clipboard
+## Testing the clipboard
 
-To verify clipboard is working:
+To verify that the clipboard is working:
 
 1. Enable debug mode
 
@@ -247,7 +247,11 @@ Look for lines like:
 - `Clipboard: Success via xsel (Linux)`
 - `Clipboard: Success via tmux buffer (tmux-only)`
 
-## Related Documentation
+## Related documentation
 
+- [README](../README.md)
+- [Configuration](CONFIGURATION.md)
+- [Debugging guide](DEBUGGING.md)
+- [Testing guide](TESTING.md)
+- [Release guide](RELEASING.md)
 - [tmux clipboard integration](https://github.com/tmux/tmux/wiki/Clipboard)
-- See [DEBUGGING.md](DEBUGGING.md) for troubleshooting clipboard issues
