@@ -47,6 +47,14 @@ def test_endpoint_uses_the_boundary_after_the_matched_query():
     assert endpoint.label == "q"
 
 
+def test_endpoint_requires_a_label_or_fallback():
+    match = make_match(text="hello", start_pos=0, line=0, col=0, match_start=0, match_end=2)
+    match.label = None
+
+    with pytest.raises(ValueError, match="requires a labelled match"):
+        RangeEndpoint.from_match(match)
+
+
 def test_word_range_is_default_and_includes_both_endpoint_words_in_either_direction():
     content = "hello world"
     left = make_match(
@@ -140,6 +148,17 @@ def test_identical_endpoint_is_not_eligible_and_cannot_be_extracted():
     assert active_range.accepts(match) is False
     with pytest.raises(ValueError, match="different"):
         active_range.extract("hello", match)
+
+
+def test_extract_rejects_an_unknown_copy_mode():
+    content = "hello world"
+    start = make_match(text="hello", start_pos=0, line=0, col=0, match_start=0, match_end=2)
+    end = make_match(
+        text="world", start_pos=6, line=0, col=6, match_start=0, match_end=1, label="s"
+    )
+
+    with pytest.raises(ValueError, match="Unknown range copy mode: invalid"):
+        ActiveRange.from_match(start).extract(content, end, copy_mode="invalid")
 
 
 def test_fallback_marker_allows_unlabelled_matches_for_enter_selection():
