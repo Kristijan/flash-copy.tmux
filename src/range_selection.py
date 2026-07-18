@@ -1,7 +1,6 @@
 """Marker-to-marker range selection over captured pane text."""
 
 from dataclasses import dataclass
-from typing import Optional
 
 from src.search_interface import SearchMatch
 
@@ -20,9 +19,7 @@ class RangeEndpoint:
     copy_end_col: int
 
     @classmethod
-    def from_match(
-        cls, match: SearchMatch, fallback_label: Optional[str] = None
-    ) -> "RangeEndpoint":
+    def from_match(cls, match: SearchMatch, fallback_label: str | None = None) -> "RangeEndpoint":
         """Create an endpoint at the boundary where a match label is rendered."""
         label = match.label or fallback_label
         if label is None:
@@ -46,7 +43,7 @@ class ActiveRange:
     start: RangeEndpoint
 
     @classmethod
-    def from_match(cls, match: SearchMatch, fallback_label: Optional[str] = None) -> "ActiveRange":
+    def from_match(cls, match: SearchMatch, fallback_label: str | None = None) -> "ActiveRange":
         """Start a range from a labelled match."""
         return cls(start=RangeEndpoint.from_match(match, fallback_label=fallback_label))
 

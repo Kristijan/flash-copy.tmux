@@ -4,7 +4,7 @@ This file provides guidance to coding agents, such as Codex and Copilot, when wo
 
 ## Project Overview
 
-tmux-flash-copy is a tmux plugin inspired by flash.nvim that enables searching visible words in the current tmux pane and copying them to the clipboard using keyboard label shortcuts. The project is written in Python 3.9+ and integrates with tmux's OSC52 clipboard support.
+tmux-flash-copy is a tmux plugin inspired by flash.nvim that enables searching visible words in the current tmux pane and copying them to the clipboard using keyboard label shortcuts. The project is written in Python 3.10+ and integrates with tmux's OSC52 clipboard support.
 
 ## Development Commands
 
@@ -124,7 +124,7 @@ Tests use pytest with comprehensive coverage. Key testing patterns:
 - Mock clipboard operations (OSC52, pbcopy, xclip)
 - Test both happy paths and error conditions
 - Coverage target is maintained above 90%
-- CI runs tests on Python 3.9, 3.10, 3.11, 3.12, 3.13, and 3.14
+- CI runs tests on Python 3.10, 3.11, 3.12, 3.13, and 3.14
 
 ## Configuration System
 
@@ -140,6 +140,6 @@ All configuration is read from tmux options. When working with config:
 Project uses ruff with:
 
 - Line length: 100 characters
-- Python 3.9+ target
+- Python 3.10+ target
 - Import sorting via isort
 - Multiple linting rules enabled (see pyproject.toml)

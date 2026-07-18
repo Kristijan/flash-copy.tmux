@@ -8,7 +8,6 @@ and keyboard labels are generated for quick selection.
 
 import re
 from collections import defaultdict
-from typing import Optional
 
 
 class SearchMatch:
@@ -21,16 +20,16 @@ class SearchMatch:
         end_pos: int,
         line: int,
         col: int,
-        copy_text: Optional[str] = None,
-        copy_start_pos: Optional[int] = None,
-        copy_end_pos: Optional[int] = None,
+        copy_text: str | None = None,
+        copy_start_pos: int | None = None,
+        copy_end_pos: int | None = None,
     ):
         self.text = text  # Extended text including separators for matching
         self.start_pos = start_pos  # Position in flattened content
         self.end_pos = end_pos
         self.line = line
         self.col = col
-        self.label: Optional[str] = None
+        self.label: str | None = None
         self.match_start: int = 0  # Start position of match within the text
         self.match_end: int = 0  # End position of match within the text
         # The actual word to copy (without leading/trailing separators)
@@ -61,7 +60,7 @@ class SearchInterface:
     DEFAULT_LABELS = "asdfghjklqwertyuiopzxcvbnmASDFGHJKLQWERTYUIOPZXCVBNM"
 
     # Cache compiled regex patterns
-    _pattern_cache: dict[Optional[str], re.Pattern] = {}
+    _pattern_cache: dict[str | None, re.Pattern] = {}
 
     @staticmethod
     def _escape_for_char_class(s: str) -> str:
@@ -76,9 +75,9 @@ class SearchInterface:
         self,
         pane_content: str,
         reverse_search: bool = True,
-        word_separators: Optional[str] = None,
+        word_separators: str | None = None,
         case_sensitive: bool = False,
-        label_characters: Optional[str] = None,
+        label_characters: str | None = None,
     ):
         """
         Initialise the search interface.
@@ -103,7 +102,7 @@ class SearchInterface:
         self._build_word_index()
 
     @classmethod
-    def _get_word_pattern(cls, word_separators: Optional[str]) -> re.Pattern:
+    def _get_word_pattern(cls, word_separators: str | None) -> re.Pattern:
         """Get or compile word boundary pattern.
 
         Args:
@@ -181,8 +180,8 @@ class SearchInterface:
         self,
         query: str,
         *,
-        excluded_label_offsets: Optional[set[int]] = None,
-        reserved_labels: Optional[set[str]] = None,
+        excluded_label_offsets: set[int] | None = None,
+        reserved_labels: set[str] | None = None,
     ) -> list[SearchMatch]:
         """
         Search for words matching the query.
@@ -237,7 +236,7 @@ class SearchInterface:
                         copy_end_pos = sequence_match.end_pos
                         if word_pattern:
                             # Find the word that contains or follows this match
-                            best_word: Optional[re.Match] = None
+                            best_word: re.Match | None = None
                             for word_match in word_pattern.finditer(sequence_match.text):
                                 word_start = word_match.start()
                                 word_end = word_match.end()
@@ -309,9 +308,7 @@ class SearchInterface:
 
         return unique_matches
 
-    def _assign_labels(
-        self, matches: list[SearchMatch], reserved_labels: Optional[set[str]] = None
-    ):
+    def _assign_labels(self, matches: list[SearchMatch], reserved_labels: set[str] | None = None):
         """
         Assign keyboard labels to matches.
 
@@ -380,7 +377,7 @@ class SearchInterface:
             else:
                 match.label = None
 
-    def get_match_by_label(self, label: str) -> Optional[SearchMatch]:
+    def get_match_by_label(self, label: str) -> SearchMatch | None:
         """
         Get a match by its label.
 

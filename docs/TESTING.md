@@ -32,11 +32,11 @@ This document explains how to set up your local development environment and run 
 
 ### Required tools
 
-1. **Python 3.9+**
+1. **Python 3.10+**
 
    ```bash
    python3 --version
-   # Should be 3.9 or higher
+   # Should be 3.10 or higher
    ```
 
 2. **uv**
@@ -196,12 +196,9 @@ Tests run automatically on every pull request to `main`.
 
 **What it runs**:
 
-1. Tests against Python 3.9, 3.10, 3.11, 3.12, 3.13, and 3.14
-2. Type checking: `uv run ty check --output-format=github`
-3. Linting: `uv run ruff check --output-format=github`
-4. Formatting: `uv run ruff format --check`
-5. Tests with coverage: `uv run pytest --cov=src --cov-report=term-missing --cov-report=xml`
-6. Uploads coverage to Codecov (Python 3.14 only)
+1. Type checking, linting, and formatting on Python 3.14
+2. Tests with coverage on Python 3.10, 3.11, 3.12, 3.13, and 3.14
+3. Uploads coverage to Codecov from the Python 3.14 test run
 
 ### Running CI checks locally
 

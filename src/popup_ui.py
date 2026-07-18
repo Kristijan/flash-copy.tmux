@@ -8,7 +8,6 @@ with a search interface, labels for matches, and handles user input.
 import contextlib
 import subprocess
 from pathlib import Path
-from typing import Optional
 
 from src.clipboard import Clipboard
 from src.config import FlashCopyConfig
@@ -46,7 +45,7 @@ class PopupUI:
         self.search_query = ""
         self.current_matches: list[SearchMatch] = []
 
-    def run(self) -> tuple[Optional[str], bool]:
+    def run(self) -> tuple[str | None, bool]:
         """
         Run the interactive popup UI.
 
@@ -59,7 +58,7 @@ class PopupUI:
 
         return result
 
-    def _launch_popup(self) -> tuple[Optional[str], bool]:
+    def _launch_popup(self) -> tuple[str | None, bool]:
         """
         Launch the tmux popup window.
 

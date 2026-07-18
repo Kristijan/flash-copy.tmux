@@ -1,7 +1,5 @@
 """Tests for marker-to-marker range selection."""
 
-from typing import Optional
-
 import pytest
 
 from src.range_selection import ActiveRange, RangeEndpoint
@@ -17,8 +15,8 @@ def make_match(
     match_start: int,
     match_end: int,
     label: str = "a",
-    copy_start_pos: Optional[int] = None,
-    copy_end_pos: Optional[int] = None,
+    copy_start_pos: int | None = None,
+    copy_end_pos: int | None = None,
 ) -> SearchMatch:
     """Build a labelled search match for range tests."""
     match = SearchMatch(

@@ -8,7 +8,6 @@ with consistent error handling and type conversion.
 import ast
 import subprocess
 from dataclasses import dataclass, field
-from typing import Optional
 
 
 @dataclass
@@ -17,7 +16,7 @@ class FlashCopyConfig:
 
     reverse_search: bool = True
     case_sensitive: bool = False
-    word_separators: Optional[str] = None
+    word_separators: str | None = None
     prompt_placeholder_text: str = "search..."
     highlight_colour: str = "\033[1;33m"
     label_colour: str = "\033[1;32m"
@@ -26,7 +25,7 @@ class FlashCopyConfig:
     prompt_colour: str = "\033[1m"
     debug_enabled: bool = False
     auto_paste_enable: bool = True
-    label_characters: Optional[str] = None
+    label_characters: str | None = None
     idle_timeout: int = 15
     idle_warning: int = 5
     range_selection_enable: bool = True
@@ -56,8 +55,8 @@ class ConfigLoader:
     """Handles reading and parsing tmux configuration options."""
 
     # Cache for batched option reads to reduce subprocess calls
-    _global_options_cache: Optional[dict[str, str]] = None
-    _window_options_cache: Optional[dict[str, str]] = None
+    _global_options_cache: dict[str, str] | None = None
+    _window_options_cache: dict[str, str] | None = None
 
     @staticmethod
     def _read_all_global_options() -> dict[str, str]:
@@ -226,7 +225,7 @@ class ConfigLoader:
         return value.lower() in ("on", "true", "1", "yes")
 
     @staticmethod
-    def parse_choice(value: str, choices: list[str]) -> Optional[str]:
+    def parse_choice(value: str, choices: list[str]) -> str | None:
         """
         Parse and validate a choice from a list of allowed values.
 
@@ -314,7 +313,7 @@ class ConfigLoader:
             return default
 
     @staticmethod
-    def get_optional_string(option_name: str) -> Optional[str]:
+    def get_optional_string(option_name: str) -> str | None:
         """
         Get string option, returning None if empty or not set.
 
@@ -328,7 +327,7 @@ class ConfigLoader:
         return value if value else None
 
     @staticmethod
-    def get_word_separators(default: Optional[str] = None) -> Optional[str]:
+    def get_word_separators(default: str | None = None) -> str | None:
         """
         Get word separators setting, with priority order.
 

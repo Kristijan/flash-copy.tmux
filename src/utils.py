@@ -7,7 +7,6 @@ timeouts, and logging.
 
 import subprocess
 from dataclasses import dataclass
-from typing import Optional
 
 
 class SubprocessUtils:
@@ -112,7 +111,7 @@ class TmuxPaneUtils:
     """Utilities for tmux pane operations and popup positioning."""
 
     @staticmethod
-    def get_pane_dimensions(pane_id: str) -> Optional[PaneDimensions]:
+    def get_pane_dimensions(pane_id: str) -> PaneDimensions | None:
         """
         Get the dimensions and position of a specific tmux pane.
 

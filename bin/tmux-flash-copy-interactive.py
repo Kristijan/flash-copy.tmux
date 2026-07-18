@@ -17,7 +17,6 @@ import termios
 import time
 import tty
 from pathlib import Path
-from typing import Optional
 
 # Add parent directory to path for imports
 PLUGIN_DIR = Path(__file__).parent.parent
@@ -75,7 +74,7 @@ class InteractiveUI:
         self.current_matches = []
         self.autopaste_modifier_active = False
         self.range_modifier_active = False
-        self.active_range: Optional[ActiveRange] = None
+        self.active_range: ActiveRange | None = None
         self.last_logged_modifier = None  # Track last logged modifier state to avoid repetition
         # Timeout tracking
         self.start_time: float = 0.0
@@ -423,7 +422,7 @@ class InteractiveUI:
         content_lines_printed = 0
         total_lines = min(len(lines), available_height)
 
-        for line_idx, (line, line_plain) in enumerate(zip(lines, lines_plain)):
+        for line_idx, (line, line_plain) in enumerate(zip(lines, lines_plain, strict=True)):
             # Stop if we've filled available height
             if content_lines_printed >= available_height:
                 break
@@ -555,7 +554,7 @@ class InteractiveUI:
 
             sys.stderr.flush()
 
-    def run(self) -> Optional[str]:
+    def run(self) -> str | None:
         """
         Run the interactive search UI.
 
@@ -712,7 +711,7 @@ class InteractiveUI:
         self.range_modifier_active = False
         self.last_logged_modifier = None
 
-    def _select_match(self, match: SearchMatch) -> Optional[str]:
+    def _select_match(self, match: SearchMatch) -> str | None:
         """Apply the current selection mode to a chosen match."""
         if self.active_range:
             text = self.active_range.extract(

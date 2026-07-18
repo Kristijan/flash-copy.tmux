@@ -6,7 +6,6 @@ with native system tools (pbcopy/xclip) as fallbacks when available.
 
 import os
 import sys
-from typing import Optional
 
 from src.utils import SubprocessUtils
 
@@ -96,7 +95,7 @@ class Clipboard:
 
     @staticmethod
     def copy_and_paste(
-        text: str, pane_id: Optional[str] = None, auto_paste: bool = False, logger=None
+        text: str, pane_id: str | None = None, auto_paste: bool = False, logger=None
     ) -> bool:
         """Copy text to clipboard and optionally paste to pane.
 
