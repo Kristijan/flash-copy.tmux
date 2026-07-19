@@ -1,7 +1,7 @@
 # https://github.com/charmbracelet/vhs
 
 # GIF output file
-Output tmux-flash-copy-demo.gif
+Output range-copy.gif
 
 # Terminal setup
 Set Theme "Catppuccin Mocha"
@@ -21,19 +21,19 @@ Require bat
 
 # Launch tmux (hidden in GIF)
 Hide
-Type "tmux new -s tmux-flash-copy -n demo" Enter
+Type "tmux new -s tmux-flash-copy -n range-copy" Enter
 Sleep 5s
-Type "cd /Users/kristijan/GitHub/tmux-flash-copy" Enter
+Type "cd /Users/kristijan/GitHub/flash-copy.tmux" Enter
 Type "clear" Enter
 Show
 
 # cat tmux-flash-copy.tmux file
 Sleep 2s
-Type "bat -pp tmux-flash-copy.tmux" Enter
+Type "bat -pp --color never tmux-flash-copy.tmux" Enter
 Sleep 500ms
 
 # Commentary
-Type `"I'll now search for the word 'option_override' in the output using tmux-flash-copy"`
+Type `"I'll now copy 'tmux-flash-copy plugin file' from the second line in this file."`
 Sleep 2s
 Ctrl+u
 
@@ -43,16 +43,23 @@ Sleep 500ms
 Type "f"
 Sleep 500ms
 
-# Type search query
-Type@500ms "option"
+# Type first marker
+Type@500ms "tmux"
 Sleep 1.5s
-Type "j"
+Type ",k"
+Sleep 1s
+
+# Type second marker
+Type@500ms "file"
+Sleep 1.5s
+Type "a"
+Sleep 1s
 
 # Paste copied text
-Type `"I selected label 'j', and the text is now in my clipboard!"`
+Type `"The first marker remains highlighted while you search for the second marker."`
 Sleep 1s
 Ctrl+u
-Copy "option_override"
+Copy "tmux-flash-copy plugin file"
 Type "Pasting"
 Type@500ms "..."
 Type " "
@@ -63,4 +70,4 @@ Sleep 5s
 
 # Kill the tmux server (hidden in GIF)
 Hide
-Type "tmux kill-session -t tmux-flash-copy" Enter
+Type "tmux kill-server" Enter
