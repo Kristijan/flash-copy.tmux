@@ -15,8 +15,6 @@
 
 A tmux plugin inspired by [flash.nvim](https://github.com/folke/flash.nvim) that enables you to search visible words in the current tmux pane, then copy that word, or a ranged selection, to the system clipboard by pressing the associated label key.
 
-![Demonstration of tmux-flash-copy in action](assets/tmux-flash-copy-demo.gif)
-
 ## Features
 
 - **Dynamic Search**: Type to filter words in real-time as you search.
@@ -25,6 +23,24 @@ A tmux plugin inspired by [flash.nvim](https://github.com/folke/flash.nvim) that
 - **Clipboard Copy**: Selected text is immediately copied to the system clipboard.
 - **Auto-paste Modifier**: Use semicolon key as a modifier to automatically paste selected text.
 - **Configurable Word Boundaries**: Honours tmux's `word-separators` by default, with override support.
+
+## Demonstrations
+
+### Single word copy
+
+![Demonstration showing a copy of a single word using TMUX Flash Copy](assets/single-word-copy.gif)
+
+> [!TIP]
+> You can auto-paste your selected match by using the `;` (semicolon) modifier key.
+> See the [Auto-paste text](#auto-paste-text) section for more details.
+
+### Range copy
+
+![Demonstration showing a copy of a text range using TMUX Flash Copy](assets/range-copy.gif)
+
+> [!TIP]
+> Range mode can copy multiple lines of text, above or below the first marker.
+> See the [Copy a range](#copy-a-range) section for the full flow.
 
 ### Table of contents
 
@@ -35,19 +51,21 @@ A tmux plugin inspired by [flash.nvim](https://github.com/folke/flash.nvim) that
 - [Clipboard implementation](#clipboard-implementation)
 - [Debugging](#debugging)
 - [Development and testing](#development-and-testing)
-- [Demonstration](#demonstration)
+- [Demonstration configuration](#demonstration-configuration)
 - [Contributing](#contributing)
 - [Inspiration](#inspiration)
 - [Other plugins](#other-plugins)
 
 ## Requirements
 
-- [tmux](https://github.com/tmux/tmux) 3.2+ (tested with tmux 3.6a)
-- [Python](https://www.python.org) 3.10+ (tested with Python 3.14.2)
+- [tmux](https://github.com/tmux/tmux) 3.2+ (tested with tmux 3.7b)
+- [Python](https://www.python.org) 3.10+ (tested with Python 3.14.6)
 
 ## Installation
 
-### Using TPM (recommended)
+<details>
+
+<summary>Using TPM (recommended)</summary>
 
 1. Install [TPM (Tmux Plugin Manager)](https://github.com/tmux-plugins/tpm).
 
@@ -63,7 +81,11 @@ A tmux plugin inspired by [flash.nvim](https://github.com/folke/flash.nvim) that
 
    Press `<tmux_prefix> + U` (capital u, as in Update) to update the plugin.
 
-### Manual installation
+</details>
+
+<details>
+
+<summary>Manual installation</summary>
 
 1. Clone this repository to your desired location:
 
@@ -93,6 +115,8 @@ A tmux plugin inspired by [flash.nvim](https://github.com/folke/flash.nvim) that
    tmux source-file ~/.tmux.conf
    ```
 
+</details>
+
 ## Usage
 
 1. Press the bind key (default: `<tmux_prefix> F`, or `<tmux_prefix> Shift+f`) to activate the search.
@@ -100,14 +124,6 @@ A tmux plugin inspired by [flash.nvim](https://github.com/folke/flash.nvim) that
 3. Matching words will be highlighted in yellow with single-character labels in green.
 4. Press the label key corresponding to the word you want to copy.
 5. The selected text is immediately copied to your clipboard, and you are returned to your pane.
-
-> [!TIP]
-> You can auto-paste your selected match by using the `;` (semicolon) modifier key.
-> See the [Auto-paste text](#auto-paste-text) section for more details.
-
-> [!TIP]
-> Press `,` (comma) before a label to pin the first endpoint of a text range.
-> See the [Copy a range](#copy-a-range) section for the full flow.
 
 ### Keybindings when search is active
 
@@ -163,7 +179,7 @@ See the [Testing guide](docs/TESTING.md) to set up a development environment and
 
 See the [Release guide](docs/RELEASING.md) for the versioning, validation, tagging, and publication checklist.
 
-## Demonstration
+## Demonstration configuration
 
 The following configuration is used in the demonstration GIF.
 
@@ -177,7 +193,8 @@ set -g @flash-copy-prompt-colour "\033[38;2;203;166;247m"
 
 - Font is [MonaspiceAr Nerd Font Mono](https://github.com/githubnext/monaspace)
 - Shell prompt is [starship](https://starship.rs)
-- Catppuccin Mocha theme is used for both [tmux](https://github.com/catppuccin/tmux) and [bat](https://github.com/catppuccin/bat).
+- tmux status bar and theme is [tmux-powerkit](https://github.com/fabioluciano/tmux-powerkit)
+- bat theme is [catppuccin mocha](https://github.com/catppuccin/bat).
 
 ## Contributing
 
