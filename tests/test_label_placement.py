@@ -75,3 +75,16 @@ def test_whole_word_match_replaces_following_space():
 
     expected = "hello" + label + "world"
     assert visible == expected
+
+
+def test_end_of_line_match_replaces_final_character_without_adding_width():
+    interactive_cls = load_interactive_ui()
+    pane_content = "hello\n"
+    ui = interactive_cls("pane", pane_content, {}, FlashCopyConfig())
+
+    match = ui.search_interface.search("hello")[0]
+    rendered = ui._display_line_with_matches("hello", 0, "hello")
+    visible = AnsiUtils.strip_ansi_codes(rendered)
+
+    assert visible == "hell" + match.label
+    assert len(visible) == len("hello")

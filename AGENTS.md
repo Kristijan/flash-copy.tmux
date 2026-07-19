@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to coding agents, such as Codex and Copilot, when working with code in this repository.
 
 ## Project Overview
 
@@ -112,7 +112,7 @@ Word separators should only apply to the text that is copied to the clipboard, a
 
 As an example.
 String: tmux bind-key "${bind_key}" run-shell "${PLUGIN_DIR}/bin/tmux-flash-copy.py"
-Configured word separators: ' ()":,;<>~!@#$%^&*|+=[]{}?`''
+Configured word separators: ' ()":,;<>~!@#$%^&\*|+=[]{}?`''
 
 I should be able to search for ${b and it apply a label to "${bind_key}". If that label is selected, only the word bind_key should be copied.
 

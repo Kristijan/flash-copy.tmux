@@ -7,8 +7,7 @@ with consistent error handling and type conversion.
 
 import ast
 import subprocess
-from dataclasses import dataclass
-from typing import Optional
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -17,7 +16,7 @@ class FlashCopyConfig:
 
     reverse_search: bool = True
     case_sensitive: bool = False
-    word_separators: Optional[str] = None
+    word_separators: str | None = None
     prompt_placeholder_text: str = "search..."
     highlight_colour: str = "\033[1;33m"
     label_colour: str = "\033[1;32m"
@@ -26,17 +25,38 @@ class FlashCopyConfig:
     prompt_colour: str = "\033[1m"
     debug_enabled: bool = False
     auto_paste_enable: bool = True
-    label_characters: Optional[str] = None
+    label_characters: str | None = None
     idle_timeout: int = 15
     idle_warning: int = 5
+    range_selection_enable: bool = True
+    range_selection_key: str = ","
+    range_copy_mode: str = "word"
+    range_marker_fg_colour: str = "\033[30m"
+    range_marker_bg_colour: str = "\033[45m"
+    range_selection_key_fell_back: bool = field(init=False, default=False, repr=False)
+
+    def __post_init__(self):
+        """Validate configuration that depends on multiple option values."""
+        self.range_copy_mode = self.range_copy_mode.lower()
+        if self.range_copy_mode not in ("word", "precise"):
+            self.range_copy_mode = "word"
+
+        key_is_valid = len(self.range_selection_key) == 1 and self.range_selection_key.isprintable()
+        conflicts_with_auto_paste = self.auto_paste_enable and self.range_selection_key in (
+            ";",
+            ":",
+        )
+        if not key_is_valid or conflicts_with_auto_paste:
+            self.range_selection_key = ","
+            self.range_selection_key_fell_back = True
 
 
 class ConfigLoader:
     """Handles reading and parsing tmux configuration options."""
 
     # Cache for batched option reads to reduce subprocess calls
-    _global_options_cache: Optional[dict[str, str]] = None
-    _window_options_cache: Optional[dict[str, str]] = None
+    _global_options_cache: dict[str, str] | None = None
+    _window_options_cache: dict[str, str] | None = None
 
     @staticmethod
     def _read_all_global_options() -> dict[str, str]:
@@ -72,6 +92,9 @@ class ConfigLoader:
                                 except (ValueError, SyntaxError):
                                     # Fallback: just strip quotes without decoding
                                     value = value[1:-1]
+                            else:
+                                # tmux doubles literal backslashes in unquoted show-options output.
+                                value = value.replace("\\\\", "\\")
                             options[key] = value
         except (subprocess.SubprocessError, OSError):
             pass
@@ -202,7 +225,7 @@ class ConfigLoader:
         return value.lower() in ("on", "true", "1", "yes")
 
     @staticmethod
-    def parse_choice(value: str, choices: list[str]) -> Optional[str]:
+    def parse_choice(value: str, choices: list[str]) -> str | None:
         """
         Parse and validate a choice from a list of allowed values.
 
@@ -290,7 +313,7 @@ class ConfigLoader:
             return default
 
     @staticmethod
-    def get_optional_string(option_name: str) -> Optional[str]:
+    def get_optional_string(option_name: str) -> str | None:
         """
         Get string option, returning None if empty or not set.
 
@@ -304,7 +327,7 @@ class ConfigLoader:
         return value if value else None
 
     @staticmethod
-    def get_word_separators(default: Optional[str] = None) -> Optional[str]:
+    def get_word_separators(default: str | None = None) -> str | None:
         """
         Get word separators setting, with priority order.
 
@@ -417,4 +440,21 @@ class ConfigLoader:
             label_characters=ConfigLoader.get_optional_string("@flash-copy-label-characters"),
             idle_timeout=ConfigLoader.get_int("@flash-copy-idle-timeout", default=15),
             idle_warning=ConfigLoader.get_int("@flash-copy-idle-warning", default=5),
+            range_selection_enable=ConfigLoader.get_bool(
+                "@flash-copy-range-selection", default=True
+            ),
+            range_selection_key=ConfigLoader.get_string(
+                "@flash-copy-range-selection-key", default=","
+            ),
+            range_copy_mode=ConfigLoader.get_choice(
+                "@flash-copy-range-copy-mode",
+                choices=["word", "precise"],
+                default="word",
+            ),
+            range_marker_fg_colour=ConfigLoader.get_string(
+                "@flash-copy-range-marker-fg-colour", default="\033[30m"
+            ),
+            range_marker_bg_colour=ConfigLoader.get_string(
+                "@flash-copy-range-marker-bg-colour", default="\033[45m"
+            ),
         )

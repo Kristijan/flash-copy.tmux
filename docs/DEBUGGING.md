@@ -1,33 +1,34 @@
-# Debugging Guide
+# Debugging guide
 
 This document explains how to enable and use the debugging features in tmux-flash-copy to troubleshoot issues.
 
-## Table of Contents
+## Table of contents
 
-- [Enabling/Disabling Debug Mode](#enablingdisabling-debug-mode)
-  - [Enable Debug Mode](#enable-debug-mode)
-  - [Disable Debug Mode](#disable-debug-mode)
-- [Debug Log Location](#debug-log-location)
-- [Visual Debug Indicator](#visual-debug-indicator)
-- [Idle Timeout](#idle-timeout)
-- [What Gets Logged](#what-gets-logged)
-  - [1. Session Header](#1-session-header)
-  - [2. Configuration Settings](#2-configuration-settings)
-  - [3. Tmux Environment](#3-tmux-environment)
-  - [4. Pane Layout (ASCII Art)](#4-pane-layout-ascii-art)
-  - [5. Search Activity](#5-search-activity)
-  - [6. User Actions](#6-user-actions)
-- [Common Issues and What to Look For](#common-issues-and-what-to-look-for)
-  - [Issue: Clipboard Not Working](#issue-clipboard-not-working)
-  - [Issue: No Matches Found](#issue-no-matches-found)
-  - [Issue: Popup Not Appearing or Mispositioned](#issue-popup-not-appearing-or-mispositioned)
-  - [Issue: Labels Not Appearing](#issue-labels-not-appearing)
-  - [Issue: Performance Problems](#issue-performance-problems)
-- [Reporting Issues](#reporting-issues)
+- [Enabling or disabling debug mode](#enabling-or-disabling-debug-mode)
+  - [Enable debug mode](#enable-debug-mode)
+  - [Disable debug mode](#disable-debug-mode)
+- [Debug log location](#debug-log-location)
+- [Visual debug indicator](#visual-debug-indicator)
+- [Idle timeout](#idle-timeout)
+- [What gets logged](#what-gets-logged)
+  - [1. Session header](#1-session-header)
+  - [2. Configuration settings](#2-configuration-settings)
+  - [3. tmux environment](#3-tmux-environment)
+  - [4. Pane layout (ASCII art)](#4-pane-layout-ascii-art)
+  - [5. Search activity](#5-search-activity)
+  - [6. User actions](#6-user-actions)
+- [Common issues and what to look for](#common-issues-and-what-to-look-for)
+  - [Issue: Clipboard not working](#issue-clipboard-not-working)
+  - [Issue: No matches found](#issue-no-matches-found)
+  - [Issue: Popup not appearing or mispositioned](#issue-popup-not-appearing-or-mispositioned)
+  - [Issue: Labels not appearing](#issue-labels-not-appearing)
+  - [Issue: Performance problems](#issue-performance-problems)
+- [Reporting issues](#reporting-issues)
+- [Related documentation](#related-documentation)
 
-## Enabling/Disabling Debug Mode
+## Enabling or disabling debug mode
 
-### Enable Debug Mode
+### Enable debug mode
 
 Add the following to your `~/.tmux.conf`:
 
@@ -44,7 +45,7 @@ tmux source ~/.tmux.conf
 
 Or restart tmux entirely.
 
-### Disable Debug Mode
+### Disable debug mode
 
 ```bash
 # Disable debug logging
@@ -59,7 +60,7 @@ tmux source ~/.tmux.conf
 
 Or restart tmux entirely.
 
-## Debug Log Location
+## Debug log location
 
 - **Path**: `~/.tmux-flash-copy-debug.log`
 - **Max size**: 5 MB per file
@@ -72,7 +73,7 @@ The log automatically rotates when it reaches 5MB, ensuring it doesn't consume e
 - `~/.tmux-flash-copy-debug.log.1` - Previous log (after rotation)
 - `~/.tmux-flash-copy-debug.log.2` - Older log (after second rotation)
 
-## Visual Debug Indicator
+## Visual debug indicator
 
 When debug mode is active, you'll see a persistent indicator on the right side of the search prompt:
 
@@ -83,7 +84,7 @@ When debug mode is active, you'll see a persistent indicator on the right side o
 
 This serves as a visual reminder that debug logging is enabled.
 
-## Idle Timeout
+## Idle timeout
 
 To prevent the popup from blocking indefinitely if left open, tmux-flash-copy includes an **automatic idle timeout**:
 
@@ -93,7 +94,7 @@ To prevent the popup from blocking indefinitely if left open, tmux-flash-copy in
 - **Warning**: Appears 5 seconds before timeout (at 10 seconds elapsed, configurable via `@flash-copy-idle-warning`)
 - **Auto-exit**: At 15 seconds, the popup closes automatically (same as pressing ESC)
 
-The `@flash-copy-idle-warning` value specifies how many seconds BEFORE the timeout the warning should appear. For example, with the default settings (timeout=15, warning=5), the warning appears at 10 seconds elapsed (15 - 5 = 10).
+The `@flash-copy-idle-warning` value specifies how many seconds before the timeout the warning appears. With the defaults (`timeout=15`, `warning=5`), it appears after 10 seconds.
 
 ### Warning Message
 
@@ -123,7 +124,7 @@ The implementation uses two coordinated timeouts:
 
 The child process always exits gracefully at the configured timeout. The parent's timeout is a backup that should never be reached under normal circumstances.
 
-**Note**: The warning value represents seconds BEFORE timeout, not absolute time. If `@flash-copy-idle-warning` is set equal to or greater than `@flash-copy-idle-timeout`, no warning will be displayed.
+**Note**: The warning value is relative to the timeout, not an absolute time. If `@flash-copy-idle-warning` is equal to or greater than `@flash-copy-idle-timeout`, no warning is displayed.
 
 ### Debug Logging
 
@@ -144,7 +145,7 @@ You can always exit before the timeout by:
 
 ### Configuration
 
-The idle timeout behaviour can be customized via tmux configuration options:
+Customise the idle timeout with these tmux options:
 
 ```bash
 # Set idle timeout to 30 seconds (default: 15)
@@ -154,13 +155,13 @@ set -g @flash-copy-idle-timeout "30"
 set -g @flash-copy-idle-warning "10"
 ```
 
-See the [Configuration Options](README.md#configuration-options) section in README.md for more details.
+See [Configuration options](CONFIGURATION.md#configuration-options) for more details.
 
-## What Gets Logged
+## What gets logged
 
 The debug log captures information about each tmux-flash-copy session:
 
-### 1. Session Header
+### 1. Session header
 
 ```text
 [2026-01-05T10:30:45.123] ================================================================================
@@ -172,7 +173,7 @@ The debug log captures information about each tmux-flash-copy session:
 [2026-01-05T10:30:45.125] Log file: /Users/username/.tmux-flash-copy-debug.log
 ```
 
-### 2. Configuration Settings
+### 2. Configuration settings
 
 ```text
 [2026-01-05T10:30:45.126] ================================================================================
@@ -190,7 +191,7 @@ The debug log captures information about each tmux-flash-copy session:
 [2026-01-05T10:30:45.126] prompt_colour: \033[1m
 ```
 
-### 3. Tmux Environment
+### 3. tmux environment
 
 ```text
 [2026-01-05T10:30:45.130] ================================================================================
@@ -206,7 +207,7 @@ The debug log captures information about each tmux-flash-copy session:
 [2026-01-05T10:30:45.135]   - %1: 80x24 (zsh)
 ```
 
-### 4. Pane Layout (ASCII Art)
+### 4. Pane layout (ASCII art)
 
 ```text
 [2026-01-05T10:30:45.136] ================================================================================
@@ -219,7 +220,7 @@ The debug log captures information about each tmux-flash-copy session:
 [2026-01-05T10:30:45.137] └────────────────────────────────┴───────────────────────────────┘
 ```
 
-### 5. Search Activity
+### 5. Search activity
 
 ```text
 [2026-01-05T10:30:47.456] Search query: 'test' -> 12 matches
@@ -230,16 +231,16 @@ The debug log captures information about each tmux-flash-copy session:
 [2026-01-05T10:30:47.458]   ... (first 10 matches shown)
 ```
 
-### 6. User Actions
+### 6. User actions
 
 ```text
 [2026-01-05T10:30:49.123] User selected label 'a': 'testing'
 [2026-01-05T10:30:49.125] Clipboard: Success via tmux OSC52
 ```
 
-## Common Issues and What to Look For
+## Common issues and what to look for
 
-### Issue: Clipboard Not Working
+### Issue: Clipboard not working
 
 **What to check**:
 
@@ -259,9 +260,9 @@ grep -i clipboard ~/.tmux-flash-copy-debug.log | tail -5
 - `Clipboard: Failed - not in tmux` - tmux environment not detected
 - No clipboard messages at all - clipboard code may not be running
 
-**Solution**: See [CLIPBOARD.md](CLIPBOARD.md) for detailed troubleshooting.
+**Solution**: See [Clipboard implementation](CLIPBOARD.md) for detailed troubleshooting.
 
-### Issue: No Matches Found
+### Issue: No matches found
 
 **What to check**:
 
@@ -291,7 +292,7 @@ Search query: 'test' -> 12 matches
 2. Try adjusting `@flash-copy-word-separators` in your `~/.tmux.conf`
 3. Toggle `@flash-copy-case-sensitive` setting
 
-### Issue: Popup Not Appearing or Mispositioned
+### Issue: Popup not appearing or mispositioned
 
 **What to check**:
 
@@ -311,7 +312,7 @@ Look for pane dimensions and positions.
 1. Check tmux version: `tmux -V` (should be 3.2+)
 2. Verify pane dimensions match your expectations
 
-### Issue: Labels Not Appearing
+### Issue: Labels not appearing
 
 **What to check**:
 
@@ -339,9 +340,9 @@ grep "Search query" ~/.tmux-flash-copy-debug.log | tail -20
 **Solution**:
 
 1. Refine your search query to reduce matches
-2. Customize label characters in `src/search_interface.py`
+2. Customise label characters in `src/search_interface.py`
 
-### Issue: Performance Problems
+### Issue: Performance problems
 
 **What to check**:
 Look at timestamps between actions:
@@ -364,8 +365,16 @@ grep "\[" ~/.tmux-flash-copy-debug.log | tail -20
 **Solution**:
 
 1. Use more specific search queries
-2. Simplify word separators if customized
+2. Simplify custom word separators
 
-## Reporting Issues
+## Reporting issues
 
-[Report issues via GitHub](https://github.com/Kristijan/tmux-flash-copy/issues)
+[Report issues via GitHub](https://github.com/Kristijan/flash-copy.tmux/issues)
+
+## Related documentation
+
+- [README](../README.md)
+- [Configuration](CONFIGURATION.md)
+- [Clipboard implementation](CLIPBOARD.md)
+- [Testing guide](TESTING.md)
+- [Release guide](RELEASING.md)

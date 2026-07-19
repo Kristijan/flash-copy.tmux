@@ -23,7 +23,7 @@ class DebugLogger:
     MAX_LOG_SIZE = 5 * 1024 * 1024  # 5MB
     BACKUP_COUNT = 2  # Keep .log, .log.1, .log.2
 
-    def __init__(self, enabled: bool = False, log_file: Optional[str] = None):
+    def __init__(self, enabled: bool = False, log_file: str | None = None):
         """Initialize the debug logger.
 
         Args:
@@ -38,7 +38,7 @@ class DebugLogger:
             self._ensure_log_file()
 
     @classmethod
-    def get_instance(cls, enabled: bool = False, log_file: Optional[str] = None) -> "DebugLogger":
+    def get_instance(cls, enabled: bool = False, log_file: str | None = None) -> "DebugLogger":
         """Get or create the singleton logger instance."""
         if cls._instance is None:
             with cls._lock:

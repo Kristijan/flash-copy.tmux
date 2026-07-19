@@ -45,8 +45,8 @@ class TestPopupUIAutoPaste:
         def subprocess_side_effect(cmd, **kwargs):
             result = MagicMock()
             result.returncode = 0
-            if "show-buffer" in cmd:
-                result.stdout = "test result"
+            if "save-buffer" in cmd:
+                result.stdout = "  test result  \n"
             else:
                 result.stdout = ""
             return result
@@ -54,7 +54,11 @@ class TestPopupUIAutoPaste:
         mock_subprocess.side_effect = subprocess_side_effect
 
         # Create config with auto_paste_enable=True
-        config = FlashCopyConfig(auto_paste_enable=True)
+        config = FlashCopyConfig(
+            auto_paste_enable=True,
+            range_marker_fg_colour="\033[31m",
+            range_marker_bg_colour="\033[46m",
+        )
 
         # Create PopupUI
         clipboard = MagicMock(spec=Clipboard)
@@ -70,7 +74,7 @@ class TestPopupUIAutoPaste:
             config=config,
         )
 
-        popup_ui._launch_popup()
+        selected = popup_ui._launch_popup()
 
         # Verify subprocess.run was called
         assert mock_subprocess.called
@@ -88,6 +92,12 @@ class TestPopupUIAutoPaste:
         assert "--auto-paste" in popup_call
         auto_paste_index = popup_call.index("--auto-paste")
         assert popup_call[auto_paste_index + 1] == "true"
+        assert popup_call[popup_call.index("--range-selection") + 1] == "true"
+        assert popup_call[popup_call.index("--range-selection-key") + 1] == ","
+        assert popup_call[popup_call.index("--range-copy-mode") + 1] == "word"
+        assert popup_call[popup_call.index("--range-marker-fg-colour") + 1] == "\033[31m"
+        assert popup_call[popup_call.index("--range-marker-bg-colour") + 1] == "\033[46m"
+        assert selected == ("  test result  \n", False)
 
     @patch("src.popup_ui.subprocess.run")
     @patch("src.popup_ui.TmuxPaneUtils.get_pane_dimensions")
@@ -122,7 +132,7 @@ class TestPopupUIAutoPaste:
         def subprocess_side_effect(cmd, **kwargs):
             result = MagicMock()
             result.returncode = 0
-            if "show-buffer" in cmd:
+            if "save-buffer" in cmd:
                 result.stdout = "test result"
             else:
                 result.stdout = ""
@@ -190,7 +200,7 @@ class TestPopupUIErrorHandling:
             result.returncode = 0
             if "display-message" in cmd:
                 result.stdout = "200,50"
-            elif "show-buffer" in cmd:
+            elif "save-buffer" in cmd:
                 result.stdout = "test result"
             else:
                 result.stdout = ""
@@ -242,7 +252,7 @@ class TestPopupUIErrorHandling:
                 raise subprocess.CalledProcessError(1, "tmux")
             result = MagicMock()
             result.returncode = 0
-            if "show-buffer" in cmd:
+            if "save-buffer" in cmd:
                 result.stdout = "test result"
             else:
                 result.stdout = ""
@@ -302,7 +312,7 @@ class TestPopupUIErrorHandling:
         # Mock subprocess: popup succeeds, buffer read fails
         def subprocess_side_effect(cmd, **kwargs):
             result = MagicMock()
-            if "show-buffer" in cmd:
+            if "save-buffer" in cmd:
                 raise subprocess.CalledProcessError(1, cmd)
             result.returncode = 0
             result.stdout = ""
@@ -331,7 +341,8 @@ class TestPopupUIErrorHandling:
         assert result == (None, False)
         # Should log the failure with pane-specific buffer name
         mock_logger.log.assert_any_call(
-            "Buffer read FAILED: Command '['tmux', 'show-buffer', '-b', '__tmux_flash_copy_result_test_pane__']' returned non-zero exit status 1."
+            "Buffer read FAILED: Command '['tmux', 'save-buffer', '-b', "
+            "'__tmux_flash_copy_result_test_pane__', '-']' returned non-zero exit status 1."
         )
 
     @patch("src.popup_ui.subprocess.run")

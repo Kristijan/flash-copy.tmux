@@ -120,3 +120,17 @@ class AnsiUtils:
             True if text contains ANSI codes, False otherwise
         """
         return bool(AnsiUtils.ANSI_ESCAPE_PATTERN.search(text))
+
+    @staticmethod
+    def get_active_style_at(coloured_text: str, coloured_pos: int) -> str:
+        """Return the ANSI SGR codes needed to restore the style at a position."""
+        active_codes = []
+        for match in AnsiUtils.ANSI_ESCAPE_PATTERN.finditer(coloured_text, 0, coloured_pos):
+            code = match.group()
+            parameters = code[2:-1].split(";")
+            if parameters[0] in ("", "0"):
+                active_codes = []
+                if all(parameter in ("", "0") for parameter in parameters):
+                    continue
+            active_codes.append(code)
+        return "".join(active_codes)

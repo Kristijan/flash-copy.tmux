@@ -17,7 +17,6 @@ import termios
 import time
 import tty
 from pathlib import Path
-from typing import Optional
 
 # Add parent directory to path for imports
 PLUGIN_DIR = Path(__file__).parent.parent
@@ -28,7 +27,8 @@ from src.clipboard import Clipboard  # noqa: E402
 from src.config import ConfigLoader, FlashCopyConfig  # noqa: E402
 from src.debug_logger import DebugLogger  # noqa: E402
 from src.pane_capture import PaneCapture  # noqa: E402
-from src.search_interface import SearchInterface  # noqa: E402
+from src.range_selection import ActiveRange  # noqa: E402
+from src.search_interface import SearchInterface, SearchMatch  # noqa: E402
 
 # Idle timeout defaults (configurable via @flash-copy-idle-timeout and @flash-copy-idle-warning)
 # These are kept as constants for backwards compatibility and fallback
@@ -73,6 +73,8 @@ class InteractiveUI:
         self.search_query = ""
         self.current_matches = []
         self.autopaste_modifier_active = False
+        self.range_modifier_active = False
+        self.active_range: ActiveRange | None = None
         self.last_logged_modifier = None  # Track last logged modifier state to avoid repetition
         # Timeout tracking
         self.start_time: float = 0.0
@@ -83,6 +85,8 @@ class InteractiveUI:
             if hasattr(config, "debug_enabled") and config.debug_enabled
             else None
         )
+        if self.debug_logger and self.debug_logger.enabled and config.range_selection_key_fell_back:
+            self.debug_logger.log("Invalid range selection key; falling back to ','")
 
     def _update_search(self, new_query: str):
         """
@@ -97,7 +101,20 @@ class InteractiveUI:
             new_query: The new search query string
         """
         self.search_query = new_query
-        self.current_matches = self.search_interface.search(self.search_query)
+        reserved_labels = set()
+        if self.config.range_selection_enable:
+            reserved_labels.add(self.config.range_selection_key)
+
+        excluded_offsets = None
+        if self.active_range:
+            reserved_labels.add(self.active_range.start.label)
+            excluded_offsets = {self.active_range.start.offset}
+
+        self.current_matches = self.search_interface.search(
+            self.search_query,
+            excluded_label_offsets=excluded_offsets,
+            reserved_labels=reserved_labels,
+        )
 
         # Log search query and results
         if self.debug_logger and self.debug_logger.enabled:
@@ -223,21 +240,28 @@ class InteractiveUI:
         Returns:
             The formatted search bar with prompt, query or placeholder text, and debug indicator if enabled
         """
+        range_prefix = ""
+        if self.active_range:
+            range_prefix = f"{self.config.prompt_colour}range{AnsiStyles.RESET} "
+
         # Build base prompt
         if self.search_query:
             base_output = (
-                f"{self.config.prompt_colour}{self.config.prompt_indicator}{AnsiStyles.RESET} "
+                range_prefix
+                + f"{self.config.prompt_colour}{self.config.prompt_indicator}{AnsiStyles.RESET} "
                 + self.search_query
             )
         elif self.config.prompt_placeholder_text:
             base_output = (
-                f"{self.config.prompt_colour}{self.config.prompt_indicator}{AnsiStyles.RESET} {AnsiStyles.DIM}"
+                range_prefix
+                + f"{self.config.prompt_colour}{self.config.prompt_indicator}{AnsiStyles.RESET} {AnsiStyles.DIM}"
                 + self.config.prompt_placeholder_text
                 + AnsiStyles.RESET
             )
         else:
             base_output = (
-                f"{self.config.prompt_colour}{self.config.prompt_indicator}{AnsiStyles.RESET} "
+                range_prefix
+                + f"{self.config.prompt_colour}{self.config.prompt_indicator}{AnsiStyles.RESET} "
             )
 
         # Try to get terminal width for right-aligned indicators
@@ -326,58 +350,65 @@ class InteractiveUI:
             plain_match_start = word_start + match_start_in_word
             plain_match_end = word_start + match_end_in_word
 
-            # We'll place the label by replacing (or inserting) the single plain
-            # character immediately after the matched substring, then apply
-            # highlighting to the matched substring. Doing the single-character
-            # replacement first keeps index calculations simpler (we're
-            # processing right-to-left so changes to the right won't affect
-            # earlier positions).
-
-            # Compute the plain index of the character to replace (immediately
-            # after the matched substring)
-            plain_replace_index = plain_match_end
-
-            # Insert or replace the single plain character with the coloured label
-            if plain_replace_index < len(line_plain):
-                coloured_replace_start = get_coloured_pos(display_line, plain_replace_index)
-                # How many bytes in the coloured string correspond to one plain char
-                coloured_skip_len = get_coloured_pos(
-                    display_line[coloured_replace_start:], 1, use_cache=False
-                )
-                # Replace that single plain character with the coloured label
-                coloured_label = f"{self.config.label_colour}{match.label}{AnsiStyles.RESET}"
-                display_line = (
-                    display_line[:coloured_replace_start]
-                    + coloured_label
-                    + display_line[coloured_replace_start + coloured_skip_len :]
-                )
-            else:
-                # No character to replace (end of line) — insert label after match
-                coloured_insert_pos = get_coloured_pos(display_line, plain_replace_index)
-                coloured_label = f"{self.config.label_colour}{match.label}{AnsiStyles.RESET}"
-                display_line = (
-                    display_line[:coloured_insert_pos]
-                    + coloured_label
-                    + display_line[coloured_insert_pos:]
-                )
-
-            # Invalidate cache after modifying display_line
-            cache_line_id += 1
-
-            # Recompute coloured positions after the label insertion/replacement
+            # Highlight the matched substring before overlaying the label. This
+            # keeps an end-of-line fallback label visible when it replaces the
+            # matched word's final character.
             coloured_match_start = get_coloured_pos(display_line, plain_match_start)
             coloured_match_end = get_coloured_pos(display_line, plain_match_end)
-            # Use plain text for matched part to avoid colour code conflicts
             plain_matched_part = match.text[match_start_in_word:match_end_in_word]
-
-            # Wrap the matched substring with highlight colour (do not add label
-            # here; we've already inserted/replaced it above)
             before_match = display_line[:coloured_match_start]
             after_matched = display_line[coloured_match_end:]
             highlighted = f"{AnsiStyles.RESET}{self.config.highlight_colour}{plain_matched_part}{AnsiStyles.RESET}"
             display_line = before_match + highlighted + after_matched
+            cache_line_id += 1
+
+            # Labels never add width. At end-of-line, replace the matched final
+            # character while keeping the logical endpoint after that character.
+            plain_replace_index = plain_match_end
+            if plain_replace_index >= len(line_plain):
+                plain_replace_index = len(line_plain) - 1
+            coloured_replace_start = get_coloured_pos(display_line, plain_replace_index)
+            coloured_skip_len = get_coloured_pos(
+                display_line[coloured_replace_start:], 1, use_cache=False
+            )
+            coloured_label = f"{self.config.label_colour}{match.label}{AnsiStyles.RESET}"
+            display_line = (
+                display_line[:coloured_replace_start]
+                + coloured_label
+                + display_line[coloured_replace_start + coloured_skip_len :]
+            )
+            cache_line_id += 1
 
         return display_line
+
+    def _overlay_pinned_endpoint(self, display_line: str, line_idx: int, line_plain: str) -> str:
+        """Overlay the fixed first range endpoint without changing line width."""
+        if not self.active_range or self.active_range.start.line != line_idx or not line_plain:
+            return display_line
+
+        endpoint = self.active_range.start
+        if self.config.range_copy_mode == "word":
+            marker_start = max(0, endpoint.copy_start_col)
+            marker_end = min(len(line_plain), endpoint.copy_end_col)
+        else:
+            marker_start = max(0, endpoint.col - 1)
+            marker_end = min(len(line_plain), marker_start + 1)
+
+        original_marker_end = AnsiUtils.map_position_to_coloured(display_line, marker_end)
+        restored_style = AnsiUtils.get_active_style_at(display_line, original_marker_end)
+
+        coloured_start = AnsiUtils.map_position_to_coloured(display_line, marker_start)
+        coloured_end = AnsiUtils.map_position_to_coloured(display_line, marker_end)
+        marked_text = line_plain[marker_start:marker_end]
+        marker_style = f"{self.config.range_marker_fg_colour}{self.config.range_marker_bg_colour}"
+        return (
+            display_line[:coloured_start]
+            + marker_style
+            + marked_text
+            + AnsiStyles.RESET
+            + restored_style
+            + display_line[coloured_end:]
+        )
 
     def _display_pane_content(self, lines: list, lines_plain: list, available_height: int):
         """
@@ -391,7 +422,7 @@ class InteractiveUI:
         content_lines_printed = 0
         total_lines = min(len(lines), available_height)
 
-        for line_idx, (line, line_plain) in enumerate(zip(lines, lines_plain)):
+        for line_idx, (line, line_plain) in enumerate(zip(lines, lines_plain, strict=True)):
             # Stop if we've filled available height
             if content_lines_printed >= available_height:
                 break
@@ -402,6 +433,7 @@ class InteractiveUI:
             if not matches_on_line:
                 # Dim the line if there are search results but none on this line
                 output = self._dim_coloured_line(line) if self.search_query else line
+                output = self._overlay_pinned_endpoint(output, line_idx, line_plain)
 
                 # Skip newline on last line to prevent blank line before search bar
                 if is_last_line:
@@ -417,6 +449,7 @@ class InteractiveUI:
             # Pass the plain (ANSI-stripped) version of the line so we can inspect
             # plain characters (e.g. to detect a following space to overwrite).
             display_line = self._display_line_with_matches(dimmed_line, line_idx, line_plain)
+            display_line = self._overlay_pinned_endpoint(display_line, line_idx, line_plain)
 
             # Skip newline on last line to prevent blank line before search bar
             if is_last_line:
@@ -488,6 +521,8 @@ class InteractiveUI:
         if self.config.prompt_position == "top":
             # Move cursor to line 1 (search bar), column after prompt indicator
             cursor_col = len(self.config.prompt_indicator) + 2
+            if self.active_range:
+                cursor_col += len("range ")
             # Calculate position after the search query text
             if self.search_query:
                 cursor_col += len(self.search_query)
@@ -511,13 +546,15 @@ class InteractiveUI:
             # Position cursor after the prompt and search query (on the left side)
             # Calculate the visible cursor position (ignore ANSI codes and right-aligned debug text)
             cursor_col = len(self.config.prompt_indicator) + 2
+            if self.active_range:
+                cursor_col += len("range ")
             if self.search_query:
                 cursor_col += len(self.search_query)
             sys.stderr.write(f"\033[{cursor_col}G")
 
             sys.stderr.flush()
 
-    def run(self) -> Optional[str]:
+    def run(self) -> str | None:
         """
         Run the interactive search UI.
 
@@ -589,6 +626,15 @@ class InteractiveUI:
                         "", should_paste=False
                     )  # Write empty file to signal completion
                     return None
+                elif (
+                    self.config.range_selection_enable
+                    and self.active_range is None
+                    and char == self.config.range_selection_key
+                ):
+                    self.range_modifier_active = True
+                    if self.debug_logger and self.debug_logger.enabled:
+                        self.debug_logger.log("Range selection modifier activated")
+                    continue
                 elif char in (";", ":"):
                     # Semicolon/colon handling depends on auto-paste enabled setting
                     if self.config.auto_paste_enable:
@@ -605,12 +651,10 @@ class InteractiveUI:
                         self.last_logged_modifier = None  # Reset logged state
                         self._update_search(self.search_query + char)
                 elif char == ControlChars.CTRL_U:  # Clear line
-                    self.autopaste_modifier_active = False
-                    self.last_logged_modifier = None
+                    self._reset_modifiers()
                     self._update_search("")
                 elif char == ControlChars.CTRL_W:  # Delete word backwards
-                    self.autopaste_modifier_active = False
-                    self.last_logged_modifier = None
+                    self._reset_modifiers()
                     if self.search_query:
                         # Delete backwards treating delimiters as word boundaries
                         new_query = self.search_query.rstrip()  # Remove trailing whitespace
@@ -627,24 +671,15 @@ class InteractiveUI:
                             new_query = new_query[: i + 1]
                         self._update_search(new_query)
                 elif char == ControlChars.BACKSPACE or char == ControlChars.BACKSPACE_ALT:
-                    self.autopaste_modifier_active = False
-                    self.last_logged_modifier = None
+                    self._reset_modifiers()
                     if self.search_query:
                         self._update_search(self.search_query[:-1])
                 elif char == ControlChars.ENTER or char == ControlChars.ENTER_ALT:
                     if self.current_matches:
-                        # Select the first match
-                        # Use autopaste modifier if active
-                        should_paste = self.autopaste_modifier_active
-                        if self.debug_logger and self.debug_logger.enabled:
-                            paste_msg = " with auto-paste" if should_paste else ""
-                            self.debug_logger.log(
-                                f"User pressed Enter{paste_msg} - selected first match: '{self.current_matches[0].text}'"
-                            )
-                        self._save_result(
-                            self.current_matches[0].copy_text, should_paste=should_paste
-                        )
-                        return self.current_matches[0].copy_text
+                        selected_text = self._select_match(self.current_matches[0])
+                        if selected_text is not None:
+                            return selected_text
+                        continue
                 elif char.isprintable():
                     # Check if this character is a label for current matches
                     # But only if we already have a non-empty search query
@@ -652,16 +687,10 @@ class InteractiveUI:
                     if self.current_matches and self.search_query:
                         match = self.search_interface.get_match_by_label(char)
                         if match:
-                            # Label pressed - save result and exit
-                            # Use autopaste modifier if active for auto-paste
-                            should_paste = self.autopaste_modifier_active
-                            if self.debug_logger and self.debug_logger.enabled:
-                                paste_msg = " with auto-paste" if should_paste else ""
-                                self.debug_logger.log(
-                                    f"User selected label '{char}'{paste_msg}: '{match.text}'"
-                                )
-                            self._save_result(match.copy_text, should_paste=should_paste)
-                            return match.copy_text
+                            selected_text = self._select_match(match)
+                            if selected_text is not None:
+                                return selected_text
+                            continue
 
                     # Regular character - add to search query
                     # Don't reset modifier when typing (allows holding modifier while selecting)
@@ -675,6 +704,51 @@ class InteractiveUI:
             self._reset_terminal()
             # Clean up terminal
             self._clear_screen()
+
+    def _reset_modifiers(self):
+        """Clear sticky modifier state after an editing command."""
+        self.autopaste_modifier_active = False
+        self.range_modifier_active = False
+        self.last_logged_modifier = None
+
+    def _select_match(self, match: SearchMatch) -> str | None:
+        """Apply the current selection mode to a chosen match."""
+        if self.active_range:
+            text = self.active_range.extract(
+                self.pane_content_plain,
+                match,
+                copy_mode=self.config.range_copy_mode,
+            )
+            if self.debug_logger and self.debug_logger.enabled:
+                self.debug_logger.log(
+                    f"Range completed at offset {match.label_offset}"
+                    f" (length: {len(text)}, auto-paste: {self.autopaste_modifier_active})"
+                )
+            self._save_result(text, should_paste=self.autopaste_modifier_active)
+            return text
+
+        if self.range_modifier_active:
+            self._begin_range(match)
+            return None
+
+        if self.debug_logger and self.debug_logger.enabled:
+            self.debug_logger.log(
+                f"Match selected: '{match.text}' (auto-paste: {self.autopaste_modifier_active})"
+            )
+        self._save_result(match.copy_text, should_paste=self.autopaste_modifier_active)
+        return match.copy_text
+
+    def _begin_range(self, match: SearchMatch):
+        """Pin the first endpoint and begin a fresh search for the second."""
+        self.active_range = ActiveRange.from_match(match, fallback_label="+")
+        self.range_modifier_active = False
+        self.autopaste_modifier_active = False
+        self.last_logged_modifier = None
+        if self.debug_logger and self.debug_logger.enabled:
+            self.debug_logger.log(
+                f"Range start selected at offset {self.active_range.start.offset}"
+            )
+        self._update_search("")
 
     def _save_result(self, text: str, should_paste: bool = False):
         """Store the result in a tmux buffer for the parent process to read.
@@ -755,6 +829,24 @@ def main():
         default="5",
         help="Seconds before timeout to show warning",
     )
+    parser.add_argument("--range-selection", default="true", help="Enable range selection")
+    parser.add_argument("--range-selection-key", default=",", help="Range selection modifier")
+    parser.add_argument(
+        "--range-copy-mode",
+        choices=["word", "precise"],
+        default="word",
+        help="Range copy mode",
+    )
+    parser.add_argument(
+        "--range-marker-fg-colour",
+        default="\033[30m",
+        help="ANSI foreground colour for the pinned range marker",
+    )
+    parser.add_argument(
+        "--range-marker-bg-colour",
+        default="\033[45m",
+        help="ANSI background colour for the pinned range marker",
+    )
 
     args = parser.parse_args()
 
@@ -800,6 +892,11 @@ def main():
             label_characters=args.label_characters if args.label_characters else None,
             idle_timeout=int(args.idle_timeout),
             idle_warning=int(args.idle_warning),
+            range_selection_enable=ConfigLoader.parse_bool(args.range_selection),
+            range_selection_key=args.range_selection_key,
+            range_copy_mode=args.range_copy_mode,
+            range_marker_fg_colour=args.range_marker_fg_colour,
+            range_marker_bg_colour=args.range_marker_bg_colour,
         )
 
         # Initialize debug logger if enabled

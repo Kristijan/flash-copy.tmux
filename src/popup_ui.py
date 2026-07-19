@@ -8,7 +8,6 @@ with a search interface, labels for matches, and handles user input.
 import contextlib
 import subprocess
 from pathlib import Path
-from typing import Optional
 
 from src.clipboard import Clipboard
 from src.config import FlashCopyConfig
@@ -46,7 +45,7 @@ class PopupUI:
         self.search_query = ""
         self.current_matches: list[SearchMatch] = []
 
-    def run(self) -> tuple[Optional[str], bool]:
+    def run(self) -> tuple[str | None, bool]:
         """
         Run the interactive popup UI.
 
@@ -59,7 +58,7 @@ class PopupUI:
 
         return result
 
-    def _launch_popup(self) -> tuple[Optional[str], bool]:
+    def _launch_popup(self) -> tuple[str | None, bool]:
         """
         Launch the tmux popup window.
 
@@ -162,6 +161,16 @@ class PopupUI:
             str(self.config.idle_timeout),
             "--idle-warning",
             str(self.config.idle_warning),
+            "--range-selection",
+            "true" if self.config.range_selection_enable else "false",
+            "--range-selection-key",
+            self.config.range_selection_key,
+            "--range-copy-mode",
+            self.config.range_copy_mode,
+            "--range-marker-fg-colour",
+            self.config.range_marker_fg_colour,
+            "--range-marker-bg-colour",
+            self.config.range_marker_bg_colour,
         ]
 
         logger = DebugLogger.get_instance()
@@ -190,12 +199,12 @@ class PopupUI:
                     logger.log("Reading result from tmux buffer...")
 
                 buffer_result = subprocess.run(
-                    ["tmux", "show-buffer", "-b", result_buffer],
+                    ["tmux", "save-buffer", "-b", result_buffer, "-"],
                     capture_output=True,
                     text=True,
                     check=True,
                 )
-                result_text = buffer_result.stdout.strip() if buffer_result.stdout else None
+                result_text = buffer_result.stdout if buffer_result.stdout is not None else None
 
                 if logger.enabled:
                     if result_text:
