@@ -73,7 +73,7 @@ class InteractiveUI:
         self.search_query = ""
         self.current_matches = []
         self.autopaste_modifier_active = False
-        self.range_modifier_active = False
+        self.mode_switch_active = False
         self.active_range: ActiveRange | None = None
         self.last_logged_modifier = None  # Track last logged modifier state to avoid repetition
         # Timeout tracking
@@ -85,8 +85,8 @@ class InteractiveUI:
             if hasattr(config, "debug_enabled") and config.debug_enabled
             else None
         )
-        if self.debug_logger and self.debug_logger.enabled and config.range_selection_key_fell_back:
-            self.debug_logger.log("Invalid range selection key; falling back to ','")
+        if self.debug_logger and self.debug_logger.enabled and config.mode_switch_key_fell_back:
+            self.debug_logger.log("Invalid mode switch key; falling back to ','")
 
     def _update_search(self, new_query: str):
         """
@@ -103,7 +103,7 @@ class InteractiveUI:
         self.search_query = new_query
         reserved_labels = set()
         if self.config.range_selection_enable:
-            reserved_labels.add(self.config.range_selection_key)
+            reserved_labels.add(self.config.mode_switch_key)
 
         excluded_offsets = None
         if self.active_range:
@@ -629,11 +629,11 @@ class InteractiveUI:
                 elif (
                     self.config.range_selection_enable
                     and self.active_range is None
-                    and char == self.config.range_selection_key
+                    and char == self.config.mode_switch_key
                 ):
-                    self.range_modifier_active = True
+                    self.mode_switch_active = True
                     if self.debug_logger and self.debug_logger.enabled:
-                        self.debug_logger.log("Range selection modifier activated")
+                        self.debug_logger.log("Copy mode switch activated")
                     continue
                 elif char in (";", ":"):
                     # Semicolon/colon handling depends on auto-paste enabled setting
@@ -708,7 +708,7 @@ class InteractiveUI:
     def _reset_modifiers(self):
         """Clear sticky modifier state after an editing command."""
         self.autopaste_modifier_active = False
-        self.range_modifier_active = False
+        self.mode_switch_active = False
         self.last_logged_modifier = None
 
     def _select_match(self, match: SearchMatch) -> str | None:
@@ -727,7 +727,8 @@ class InteractiveUI:
             self._save_result(text, should_paste=self.autopaste_modifier_active)
             return text
 
-        if self.range_modifier_active:
+        use_range_mode = (self.config.copy_mode == "range") != self.mode_switch_active
+        if use_range_mode:
             self._begin_range(match)
             return None
 
@@ -741,7 +742,7 @@ class InteractiveUI:
     def _begin_range(self, match: SearchMatch):
         """Pin the first endpoint and begin a fresh search for the second."""
         self.active_range = ActiveRange.from_match(match, fallback_label="+")
-        self.range_modifier_active = False
+        self.mode_switch_active = False
         self.autopaste_modifier_active = False
         self.last_logged_modifier = None
         if self.debug_logger and self.debug_logger.enabled:
@@ -830,7 +831,13 @@ def main():
         help="Seconds before timeout to show warning",
     )
     parser.add_argument("--range-selection", default="true", help="Enable range selection")
-    parser.add_argument("--range-selection-key", default=",", help="Range selection modifier")
+    parser.add_argument(
+        "--copy-mode",
+        choices=["word", "range"],
+        default="word",
+        help="Default copy mode",
+    )
+    parser.add_argument("--mode-switch-key", default=",", help="Copy mode switch modifier")
     parser.add_argument(
         "--range-copy-mode",
         choices=["word", "precise"],
@@ -892,8 +899,9 @@ def main():
             label_characters=args.label_characters if args.label_characters else None,
             idle_timeout=int(args.idle_timeout),
             idle_warning=int(args.idle_warning),
+            copy_mode=args.copy_mode,
             range_selection_enable=ConfigLoader.parse_bool(args.range_selection),
-            range_selection_key=args.range_selection_key,
+            mode_switch_key=args.mode_switch_key,
             range_copy_mode=args.range_copy_mode,
             range_marker_fg_colour=args.range_marker_fg_colour,
             range_marker_bg_colour=args.range_marker_bg_colour,

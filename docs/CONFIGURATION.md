@@ -17,17 +17,18 @@ The following configuration options are supported. Default values are listed, wi
 
 ### General options
 
-| Option                                                                        | Description                                  |
-| ----------------------------------------------------------------------------- | -------------------------------------------- |
-| [`@flash-copy-bind-key`](#flash-copy-bind-key-default-f)                      | Key binding to activate tmux-flash-copy      |
-| [`@flash-copy-word-separators`](#flash-copy-word-separators)                  | Characters that define word boundaries       |
-| [`@flash-copy-case-sensitive`](#flash-copy-case-sensitive-default-off)        | Case-sensitive searching                     |
-| [`@flash-copy-reverse-search`](#flash-copy-reverse-search-default-on)         | Direction of label assignment when searching |
-| [`@flash-copy-auto-paste`](#flash-copy-auto-paste-default-on)                 | Enable auto-paste modifier functionality     |
-| [`@flash-copy-range-selection`](#flash-copy-range-selection-default-on)       | Enable two-endpoint range selection          |
-| [`@flash-copy-range-selection-key`](#flash-copy-range-selection-key-default-) | Key used to pin the first range endpoint     |
-| [`@flash-copy-range-copy-mode`](#flash-copy-range-copy-mode-default-word)     | Choose word or precise range boundaries      |
-| [`@flash-copy-debug`](DEBUGGING.md#enabling-or-disabling-debug-mode)          | Enable debug logging                         |
+| Option                                                                    | Description                                  |
+| ------------------------------------------------------------------------- | -------------------------------------------- |
+| [`@flash-copy-bind-key`](#flash-copy-bind-key-default-f)                  | Key binding to activate tmux-flash-copy      |
+| [`@flash-copy-word-separators`](#flash-copy-word-separators)              | Characters that define word boundaries       |
+| [`@flash-copy-case-sensitive`](#flash-copy-case-sensitive-default-off)    | Case-sensitive searching                     |
+| [`@flash-copy-reverse-search`](#flash-copy-reverse-search-default-on)     | Direction of label assignment when searching |
+| [`@flash-copy-auto-paste`](#flash-copy-auto-paste-default-on)             | Enable auto-paste modifier functionality     |
+| [`@flash-copy-mode`](#flash-copy-mode-default-word)                       | Choose the default copy mode                 |
+| [`@flash-copy-range-selection`](#flash-copy-range-selection-default-on)   | Enable two-endpoint range selection          |
+| [`@flash-copy-mode-switch-key`](#flash-copy-mode-switch-key-default-)     | Temporarily use the other copy mode          |
+| [`@flash-copy-range-copy-mode`](#flash-copy-range-copy-mode-default-word) | Choose word or precise range boundaries      |
+| [`@flash-copy-debug`](DEBUGGING.md#enabling-or-disabling-debug-mode)      | Enable debug logging                         |
 
 ### Prompt
 
@@ -125,23 +126,37 @@ set -g @flash-copy-auto-paste "off"
 
 ### `@flash-copy-range-selection` (default: `on`)
 
-Controls whether the range-selection modifier is enabled.
+Controls whether range copying and copy-mode switching are enabled.
 
-- `on` or `true`: The configured range-selection key pins the first endpoint.
-- `off` or `false`: Range selection is disabled and its key is available for normal searches.
+- `on` or `true`: Range copying and the configured mode-switch key are available.
+- `off` or `false`: Range copying is disabled, word mode is used, and the mode-switch key is available for normal searches.
 
 ```bash
 # Disable range selection and make comma searchable in the first search
 set -g @flash-copy-range-selection "off"
 ```
 
-### `@flash-copy-range-selection-key` (default: `,`)
+### `@flash-copy-mode` (default: `word`)
 
-Sets the single printable character used to pin the first range endpoint. The key cannot be `;` or `:` while auto-paste is enabled. Invalid values fall back to comma.
+Chooses the copy mode used when the plugin launches.
+
+- `word`: Selecting a match copies its word. Use the mode-switch key before selecting to start a range.
+- `range`: The first selection pins a range endpoint. Use the mode-switch key before selecting to perform a one-off word copy.
 
 ```bash
-# Use backslash as the range-selection key
-set -g @flash-copy-range-selection-key "\\"
+# Start in range mode
+set -g @flash-copy-mode "range"
+```
+
+### `@flash-copy-mode-switch-key` (default: `,`)
+
+Sets the single printable character that makes the first selection use the copy mode opposite to `@flash-copy-mode`. The key cannot be `;` or `:` while auto-paste is enabled. Invalid values fall back to comma.
+
+The key is reserved before the first selection. Once the first range endpoint is pinned, it becomes searchable during the second search.
+
+```bash
+# Use backslash as the mode-switch key
+set -g @flash-copy-mode-switch-key "\\"
 ```
 
 ### `@flash-copy-range-copy-mode` (default: `word`)

@@ -22,12 +22,13 @@ class TestFlashCopyConfig:
         assert config.prompt_colour == "\033[1m"
         assert config.debug_enabled is False
         assert config.auto_paste_enable is True
+        assert config.copy_mode == "word"
         assert config.range_selection_enable is True
-        assert config.range_selection_key == ","
+        assert config.mode_switch_key == ","
         assert config.range_copy_mode == "word"
         assert config.range_marker_fg_colour == "\033[30m"
         assert config.range_marker_bg_colour == "\033[45m"
-        assert config.range_selection_key_fell_back is False
+        assert config.mode_switch_key_fell_back is False
 
     def test_custom_values(self):
         """Test configuration with custom values."""
@@ -56,23 +57,32 @@ class TestFlashCopyConfig:
         assert config.debug_enabled is True
         assert config.auto_paste_enable is False
 
-    def test_invalid_range_selection_key_falls_back_to_comma(self):
-        config = FlashCopyConfig(range_selection_key="too long")
+    def test_copy_mode_is_normalised_and_invalid_values_fall_back_to_word(self):
+        assert FlashCopyConfig(copy_mode="RANGE").copy_mode == "range"
+        assert FlashCopyConfig(copy_mode="invalid").copy_mode == "word"
 
-        assert config.range_selection_key == ","
-        assert config.range_selection_key_fell_back is True
+    def test_range_mode_falls_back_to_word_when_range_selection_is_disabled(self):
+        config = FlashCopyConfig(copy_mode="range", range_selection_enable=False)
 
-    def test_range_selection_key_conflicting_with_auto_paste_falls_back(self):
-        config = FlashCopyConfig(range_selection_key=";")
+        assert config.copy_mode == "word"
 
-        assert config.range_selection_key == ","
-        assert config.range_selection_key_fell_back is True
+    def test_invalid_mode_switch_key_falls_back_to_comma(self):
+        config = FlashCopyConfig(mode_switch_key="too long")
 
-    def test_semicolon_range_key_is_valid_when_auto_paste_is_disabled(self):
-        config = FlashCopyConfig(auto_paste_enable=False, range_selection_key=";")
+        assert config.mode_switch_key == ","
+        assert config.mode_switch_key_fell_back is True
 
-        assert config.range_selection_key == ";"
-        assert config.range_selection_key_fell_back is False
+    def test_mode_switch_key_conflicting_with_auto_paste_falls_back(self):
+        config = FlashCopyConfig(mode_switch_key=";")
+
+        assert config.mode_switch_key == ","
+        assert config.mode_switch_key_fell_back is True
+
+    def test_semicolon_mode_switch_key_is_valid_when_auto_paste_is_disabled(self):
+        config = FlashCopyConfig(auto_paste_enable=False, mode_switch_key=";")
+
+        assert config.mode_switch_key == ";"
+        assert config.mode_switch_key_fell_back is False
 
     def test_invalid_range_copy_mode_falls_back_to_word(self):
         config = FlashCopyConfig(range_copy_mode="invalid")
@@ -109,6 +119,31 @@ class TestConfigLoader:
         result = ConfigLoader._read_all_global_options()
 
         assert result["@flash-copy-range-selection-key"] == "\\"
+
+    def test_mode_switch_key_prefers_new_option_over_legacy_alias(self):
+        options = {
+            "@flash-copy-mode-switch-key": "\\",
+            "@flash-copy-range-selection-key": ",",
+        }
+        with patch.object(ConfigLoader, "_global_options_cache", options):
+            assert ConfigLoader.get_mode_switch_key() == "\\"
+
+    def test_mode_switch_key_uses_legacy_alias_when_new_option_is_absent(self):
+        options = {"@flash-copy-range-selection-key": "\\"}
+        with patch.object(ConfigLoader, "_global_options_cache", options):
+            assert ConfigLoader.get_mode_switch_key() == "\\"
+
+    def test_empty_new_mode_switch_key_still_takes_precedence(self):
+        options = {
+            "@flash-copy-mode-switch-key": "",
+            "@flash-copy-range-selection-key": "\\",
+        }
+        with patch.object(ConfigLoader, "_global_options_cache", options):
+            key = ConfigLoader.get_mode_switch_key()
+
+        config = FlashCopyConfig(mode_switch_key=key)
+        assert config.mode_switch_key == ","
+        assert config.mode_switch_key_fell_back is True
 
     @patch("subprocess.run")
     def test_read_all_global_options_failure(self, mock_run):
@@ -614,7 +649,7 @@ class TestConfigLoader:
         """Test loading all flash-copy configuration."""
         mock_global_opts.return_value = {}
         mock_window_opts.return_value = {}
-        mock_choice.side_effect = ["bottom", "word"]
+        mock_choice.side_effect = ["bottom", "word", "word"]
         mock_bool.side_effect = [True, False, False, True, True]
         mock_word_sep.return_value = None
         mock_string.side_effect = [
@@ -646,8 +681,9 @@ class TestConfigLoader:
         assert config.auto_paste_enable is True
         assert config.idle_timeout == 15
         assert config.idle_warning == 5
+        assert config.copy_mode == "word"
         assert config.range_selection_enable is True
-        assert config.range_selection_key == ","
+        assert config.mode_switch_key == ","
         assert config.range_copy_mode == "word"
         assert config.range_marker_fg_colour == "\033[31m"
         assert config.range_marker_bg_colour == "\033[46m"
@@ -672,7 +708,7 @@ class TestConfigLoader:
         """Test loading flash-copy configuration with auto-paste disabled."""
         mock_global_opts.return_value = {}
         mock_window_opts.return_value = {}
-        mock_choice.side_effect = ["top", "precise"]
+        mock_choice.side_effect = ["top", "range", "precise"]
         mock_bool.side_effect = [True, True, True, False, True]
         mock_word_sep.return_value = " -"
         mock_string.side_effect = [
@@ -693,4 +729,5 @@ class TestConfigLoader:
         assert config.auto_paste_enable is False
         assert config.idle_timeout == 30
         assert config.idle_warning == 10
+        assert config.copy_mode == "range"
         assert config.range_copy_mode == "precise"

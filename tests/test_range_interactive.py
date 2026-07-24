@@ -49,12 +49,115 @@ def test_user_can_select_a_range_with_two_labelled_searches(monkeypatch):
 
 def test_user_can_use_backslash_as_the_range_selection_key(monkeypatch):
     interactive_cls = load_interactive_ui()
-    config = FlashCopyConfig(reverse_search=False, range_selection_key="\\")
+    config = FlashCopyConfig(reverse_search=False, mode_switch_key="\\")
     ui = interactive_cls("pane", "hello world", {}, config)
 
     selections = run_keys(monkeypatch, ui, ["h", "\\", "a", "w", "s"])
 
     assert selections == [("hello world", False)]
+
+
+def test_range_default_selects_two_endpoints_without_mode_switch_key(monkeypatch):
+    interactive_cls = load_interactive_ui()
+    config = FlashCopyConfig(copy_mode="range", reverse_search=False)
+    ui = interactive_cls("pane", "hello world", {}, config)
+
+    selections = run_keys(monkeypatch, ui, ["h", "a", "w", "s"])
+
+    assert selections == [("hello world", False)]
+
+
+def test_range_default_enter_selects_both_endpoints(monkeypatch):
+    interactive_cls = load_interactive_ui()
+    config = FlashCopyConfig(copy_mode="range", reverse_search=False)
+    ui = interactive_cls("pane", "hello world", {}, config)
+
+    selections = run_keys(monkeypatch, ui, ["h", "\n", "w", "\n"])
+
+    assert selections == [("hello world", False)]
+
+
+def test_range_default_mode_switch_key_copies_a_word(monkeypatch):
+    interactive_cls = load_interactive_ui()
+    config = FlashCopyConfig(copy_mode="range", reverse_search=False)
+    ui = interactive_cls("pane", "hello world", {}, config)
+
+    selections = run_keys(monkeypatch, ui, ["h", ",", "a"])
+
+    assert selections == [("hello", False)]
+
+
+def test_range_default_mode_switch_key_and_enter_copy_a_word(monkeypatch):
+    interactive_cls = load_interactive_ui()
+    config = FlashCopyConfig(copy_mode="range", reverse_search=False)
+    ui = interactive_cls("pane", "hello world", {}, config)
+
+    selections = run_keys(monkeypatch, ui, ["h", ",", "\n"])
+
+    assert selections == [("hello", False)]
+
+
+@pytest.mark.parametrize("modifiers", [(";", ","), (",", ";")])
+def test_range_default_mode_switch_key_can_combine_with_auto_paste(monkeypatch, modifiers):
+    interactive_cls = load_interactive_ui()
+    config = FlashCopyConfig(copy_mode="range", reverse_search=False)
+    ui = interactive_cls("pane", "hello world", {}, config)
+
+    selections = run_keys(monkeypatch, ui, ["h", *modifiers, "a"])
+
+    assert selections == [("hello", True)]
+
+
+def test_repeated_mode_switch_key_remains_armed(monkeypatch):
+    interactive_cls = load_interactive_ui()
+    config = FlashCopyConfig(copy_mode="range", reverse_search=False)
+    ui = interactive_cls("pane", "hello world", {}, config)
+
+    selections = run_keys(monkeypatch, ui, ["h", ",", ",", "a"])
+
+    assert selections == [("hello", False)]
+
+
+def test_backspace_clears_mode_switch_and_restores_range_default(monkeypatch):
+    interactive_cls = load_interactive_ui()
+    config = FlashCopyConfig(copy_mode="range", reverse_search=False)
+    ui = interactive_cls("pane", "hello world", {}, config)
+
+    selections = run_keys(monkeypatch, ui, ["h", ",", "\x7f", "h", "a", "w", "s"])
+
+    assert selections == [("hello world", False)]
+
+
+@pytest.mark.parametrize(
+    ("initial_keys", "editing_key"),
+    [(("h",), "\x15"), (("h", "e"), "\x17")],
+)
+def test_editing_commands_clear_mode_switch_and_restore_range_default(
+    monkeypatch, initial_keys, editing_key
+):
+    interactive_cls = load_interactive_ui()
+    config = FlashCopyConfig(copy_mode="range", reverse_search=False)
+    ui = interactive_cls("pane", "hello world", {}, config)
+
+    keys = [*initial_keys, ",", editing_key, "h", "a", "w", "s"]
+    selections = run_keys(monkeypatch, ui, keys)
+
+    assert selections == [("hello world", False)]
+
+
+def test_range_default_launch_uses_normal_prompt_until_first_endpoint(monkeypatch):
+    interactive_cls = load_interactive_ui()
+    config = FlashCopyConfig(copy_mode="range", reverse_search=False)
+    ui = interactive_cls("pane", "hello world", {}, config)
+    monkeypatch.setattr(ui, "_display_content", lambda: None)
+
+    initial_prompt = AnsiUtils.strip_ansi_codes(ui._build_search_bar_output())
+    ui._update_search("h")
+    ui._select_match(ui.current_matches[0])
+    second_endpoint_prompt = AnsiUtils.strip_ansi_codes(ui._build_search_bar_output())
+
+    assert initial_prompt.startswith("> search...")
+    assert second_endpoint_prompt.startswith("range >")
 
 
 def test_user_can_select_a_precise_range_when_configured(monkeypatch):
@@ -124,6 +227,24 @@ def test_disabling_range_selection_restores_comma_as_search_input(monkeypatch):
 
     assert selections == [("", False)]
     assert ui.search_query == ","
+
+
+def test_disabling_range_selection_forces_word_mode_and_makes_switch_key_searchable(monkeypatch):
+    interactive_cls = load_interactive_ui()
+    config = FlashCopyConfig(
+        copy_mode="range",
+        mode_switch_key="\\",
+        range_selection_enable=False,
+        reverse_search=False,
+    )
+    ui = interactive_cls("pane", r"hello\\world", {}, config)
+
+    selections = run_keys(monkeypatch, ui, ["\\", "\x1b"])
+
+    assert selections == [("", False)]
+    assert config.copy_mode == "word"
+    assert ui.active_range is None
+    assert ui.search_query == "\\"
 
 
 def test_escape_cancels_the_entire_plugin_while_range_mode_is_active(monkeypatch):

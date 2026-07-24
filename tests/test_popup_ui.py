@@ -93,7 +93,8 @@ class TestPopupUIAutoPaste:
         auto_paste_index = popup_call.index("--auto-paste")
         assert popup_call[auto_paste_index + 1] == "true"
         assert popup_call[popup_call.index("--range-selection") + 1] == "true"
-        assert popup_call[popup_call.index("--range-selection-key") + 1] == ","
+        assert popup_call[popup_call.index("--copy-mode") + 1] == "word"
+        assert popup_call[popup_call.index("--mode-switch-key") + 1] == ","
         assert popup_call[popup_call.index("--range-copy-mode") + 1] == "word"
         assert popup_call[popup_call.index("--range-marker-fg-colour") + 1] == "\033[31m"
         assert popup_call[popup_call.index("--range-marker-bg-colour") + 1] == "\033[46m"
