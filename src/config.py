@@ -9,6 +9,13 @@ import ast
 import subprocess
 from dataclasses import dataclass, field
 
+DEFAULT_IDLE_TIMEOUT = 15
+
+
+def _is_single_cell_label(character: str) -> bool:
+    """Return whether a label is one environment-independent visible cell."""
+    return len(character) == 1 and "!" <= character <= "~"
+
 
 @dataclass
 class FlashCopyConfig:
@@ -26,7 +33,7 @@ class FlashCopyConfig:
     debug_enabled: bool = False
     auto_paste_enable: bool = True
     label_characters: str | None = None
-    idle_timeout: int = 15
+    idle_timeout: int = DEFAULT_IDLE_TIMEOUT
     idle_warning: int = 5
     copy_mode: str = "word"
     range_selection_enable: bool = True
@@ -35,9 +42,15 @@ class FlashCopyConfig:
     range_marker_fg_colour: str = "\033[30m"
     range_marker_bg_colour: str = "\033[45m"
     mode_switch_key_fell_back: bool = field(init=False, default=False, repr=False)
+    label_characters_fell_back: bool = field(init=False, default=False, repr=False)
 
     def __post_init__(self):
         """Validate configuration that depends on multiple option values."""
+        if self.idle_timeout < 1:
+            self.idle_timeout = DEFAULT_IDLE_TIMEOUT
+        if self.idle_warning < 0:
+            self.idle_warning = 0
+
         self.copy_mode = self.copy_mode.lower()
         if self.copy_mode not in ("word", "range") or not self.range_selection_enable:
             self.copy_mode = "word"
@@ -54,6 +67,23 @@ class FlashCopyConfig:
         if not key_is_valid or conflicts_with_auto_paste:
             self.mode_switch_key = ","
             self.mode_switch_key_fell_back = True
+
+        if self.label_characters is not None:
+            reserved_keys = set()
+            if self.auto_paste_enable:
+                reserved_keys.update((";", ":"))
+            if self.range_selection_enable:
+                reserved_keys.add(self.mode_switch_key)
+
+            labels_are_valid = (
+                bool(self.label_characters)
+                and len(set(self.label_characters)) == len(self.label_characters)
+                and all(_is_single_cell_label(label) for label in self.label_characters)
+                and reserved_keys.isdisjoint(self.label_characters)
+            )
+            if not labels_are_valid:
+                self.label_characters = None
+                self.label_characters_fell_back = True
 
 
 class ConfigLoader:
@@ -262,7 +292,12 @@ class ConfigLoader:
         value = ConfigLoader._read_tmux_option(option_name, "")
         if not value:
             return default
-        return ConfigLoader.parse_bool(value)
+        normalized = value.lower()
+        if normalized in ("on", "true", "1", "yes"):
+            return True
+        if normalized in ("off", "false", "0", "no"):
+            return False
+        return default
 
     @staticmethod
     def get_string(option_name: str, default: str = "") -> str:

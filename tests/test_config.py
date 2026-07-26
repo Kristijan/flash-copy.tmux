@@ -89,6 +89,36 @@ class TestFlashCopyConfig:
 
         assert config.range_copy_mode == "word"
 
+    def test_invalid_custom_labels_fall_back_to_defaults(self):
+        invalid_sets = [
+            "aa",  # duplicate
+            "a;",  # active auto-paste key
+            "a,",  # active mode-switch key
+            "a界",  # two-cell character
+            "a\u0301",  # zero-cell combining character
+            "a\n",  # structural control
+            "a ",  # invisible label
+            "a¡",  # terminal-dependent East Asian Ambiguous width
+        ]
+
+        for label_characters in invalid_sets:
+            config = FlashCopyConfig(label_characters=label_characters)
+            assert config.label_characters is None
+            assert config.label_characters_fell_back is True
+
+    def test_valid_visible_ascii_custom_labels_are_preserved(self):
+        config = FlashCopyConfig(label_characters="asdf")
+
+        assert config.label_characters == "asdf"
+        assert config.label_characters_fell_back is False
+
+    def test_non_positive_idle_timeout_falls_back_to_default(self):
+        assert FlashCopyConfig(idle_timeout=0).idle_timeout == 15
+        assert FlashCopyConfig(idle_timeout=-1).idle_timeout == 15
+
+    def test_negative_idle_warning_is_clamped_to_zero(self):
+        assert FlashCopyConfig(idle_warning=-1).idle_warning == 0
+
 
 class TestConfigLoader:
     """Test ConfigLoader functionality."""
@@ -372,6 +402,13 @@ class TestConfigLoader:
         result = ConfigLoader.get_bool("@test-option", default=True)
 
         assert result is True
+
+    @patch("src.config.ConfigLoader._read_tmux_option")
+    def test_get_bool_invalid_value_uses_declared_default(self, mock_read):
+        mock_read.return_value = "sometimes"
+
+        assert ConfigLoader.get_bool("@test-option", default=True) is True
+        assert ConfigLoader.get_bool("@test-option", default=False) is False
 
     @patch("src.config.ConfigLoader._read_tmux_option")
     def test_get_string_with_value(self, mock_read):

@@ -26,6 +26,7 @@ spec.loader.exec_module(interactive_module)
 DEFAULT_IDLE_TIMEOUT_SECONDS = interactive_module.DEFAULT_IDLE_TIMEOUT_SECONDS
 DEFAULT_IDLE_WARNING_SECONDS = interactive_module.DEFAULT_IDLE_WARNING_SECONDS
 InteractiveUI = interactive_module.InteractiveUI
+PopupExitCode = interactive_module.PopupExitCode
 
 from src.config import FlashCopyConfig  # noqa: E402
 
@@ -152,12 +153,8 @@ class TestIdleTimeoutExit:
         with pytest.raises(SystemExit) as exc_info:
             mock_ui.run()
 
-        # Should exit with code 0 (copy, not paste)
-        assert exc_info.value.code == 0
-        # Should have written empty result to buffer
-        mock_subprocess.assert_called_once()
-        call_args = mock_subprocess.call_args[0][0]
-        assert call_args[0:2] == ["tmux", "set-buffer"]
+        assert exc_info.value.code == PopupExitCode.CANCEL
+        mock_subprocess.assert_not_called()
 
     @patch("select.select")
     @patch("time.time")

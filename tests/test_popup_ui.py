@@ -19,6 +19,43 @@ class TestPopupUIAutoPaste:
     @patch("src.popup_ui.TmuxPaneUtils.get_pane_dimensions")
     @patch("src.popup_ui.TmuxPaneUtils.calculate_popup_position")
     @patch("src.popup_ui.DebugLogger.get_instance")
+    def test_hyphen_leading_custom_labels_are_passed_as_attached_option(
+        self, mock_get_instance, mock_calc_pos, mock_get_dims, mock_subprocess
+    ):
+        mock_get_instance.return_value = MagicMock(enabled=False, log_file="")
+        mock_get_dims.return_value = MagicMock()
+        mock_calc_pos.return_value = {"x": 0, "y": 0, "width": 100, "height": 20}
+
+        def subprocess_side_effect(cmd, **kwargs):
+            if "save-buffer" in cmd:
+                return MagicMock(returncode=0, stdout="")
+            return MagicMock(returncode=0, stdout="")
+
+        mock_subprocess.side_effect = subprocess_side_effect
+        search_interface = MagicMock(spec=SearchInterface)
+        search_interface.reverse_search = True
+        search_interface.word_separators = ""
+        popup_ui = PopupUI(
+            pane_content="text",
+            search_interface=search_interface,
+            clipboard=MagicMock(spec=Clipboard),
+            pane_id="test_pane",
+            config=FlashCopyConfig(label_characters="-a"),
+        )
+
+        popup_ui.run()
+
+        popup_command = next(
+            call.args[0]
+            for call in mock_subprocess.call_args_list
+            if "display-popup" in call.args[0]
+        )
+        assert "--label-characters=-a" in popup_command
+
+    @patch("src.popup_ui.subprocess.run")
+    @patch("src.popup_ui.TmuxPaneUtils.get_pane_dimensions")
+    @patch("src.popup_ui.TmuxPaneUtils.calculate_popup_position")
+    @patch("src.popup_ui.DebugLogger.get_instance")
     def test_popup_ui_passes_auto_paste_enabled_argument(
         self, mock_get_instance, mock_calc_pos, mock_get_dims, mock_subprocess
     ):
@@ -604,10 +641,49 @@ class TestPopupUIErrorHandling:
     @patch("src.popup_ui.TmuxPaneUtils.get_pane_dimensions")
     @patch("src.popup_ui.TmuxPaneUtils.calculate_popup_position")
     @patch("src.popup_ui.DebugLogger.get_instance")
-    def test_popup_timeout_expired(
+    def test_interactive_idle_timeout_owns_popup_lifetime(
         self, mock_get_instance, mock_calc_pos, mock_get_dims, mock_subprocess
     ):
-        """Test handling of popup timeout."""
+        """Active input may extend the child session beyond its configured idle timeout."""
+        mock_logger = MagicMock()
+        mock_logger.enabled = False
+        mock_logger.log_file = ""
+        mock_get_instance.return_value = mock_logger
+        mock_get_dims.return_value = MagicMock()
+        mock_calc_pos.return_value = {"x": 0, "y": 0, "width": 100, "height": 20}
+
+        def subprocess_side_effect(cmd, **kwargs):
+            result = MagicMock(returncode=0, stdout="")
+            return result
+
+        mock_subprocess.side_effect = subprocess_side_effect
+
+        search_interface = MagicMock(spec=SearchInterface)
+        search_interface.reverse_search = True
+        search_interface.word_separators = ""
+        popup_ui = PopupUI(
+            pane_content="test content",
+            search_interface=search_interface,
+            clipboard=MagicMock(spec=Clipboard),
+            pane_id="test_pane",
+            config=FlashCopyConfig(idle_timeout=60),
+        )
+
+        assert popup_ui.run() == (None, False)
+
+        popup_call = next(
+            call for call in mock_subprocess.call_args_list if "display-popup" in call.args[0]
+        )
+        assert "timeout" not in popup_call.kwargs
+
+    @patch("src.popup_ui.subprocess.run")
+    @patch("src.popup_ui.TmuxPaneUtils.get_pane_dimensions")
+    @patch("src.popup_ui.TmuxPaneUtils.calculate_popup_position")
+    @patch("src.popup_ui.DebugLogger.get_instance")
+    def test_external_popup_timeout_is_handled(
+        self, mock_get_instance, mock_calc_pos, mock_get_dims, mock_subprocess
+    ):
+        """A caller- or platform-imposed subprocess timeout is still handled safely."""
         mock_logger = MagicMock()
         mock_logger.enabled = True
         mock_logger.log_file = ""
@@ -637,7 +713,7 @@ class TestPopupUIErrorHandling:
                 result.returncode = 0
                 return result
             # Popup command times out
-            raise subprocess.TimeoutExpired("tmux", 35.0)
+            raise subprocess.TimeoutExpired("tmux", 60.0)
 
         mock_subprocess.side_effect = subprocess_side_effect
 

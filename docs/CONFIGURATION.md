@@ -256,6 +256,7 @@ set -g @flash-copy-idle-timeout "30"
 Controls when the idle timeout warning appears, measured in seconds before the timeout.
 
 - Default: `5` seconds (warning appears 5 seconds before timeout)
+- Minimum: `0` seconds (negative values are treated as `0`)
 - Must be less than `@flash-copy-idle-timeout` for a warning to appear
 - If set equal to or greater than `@flash-copy-idle-timeout`, no warning will be displayed
 
@@ -279,6 +280,10 @@ set -g @flash-copy-idle-warning "15"  # No warning will appear
 Customises the ordered list of characters used as match labels. Provide a string of characters in the order you want them to be assigned. If left unset the plugin uses the default label set inspired by [flash.nvim](https://github.com/folke/flash.nvim).
 
 Labels are guaranteed not to exist as a continuation of the search pattern.
+Each custom label must be a unique visible ASCII character and must not conflict with the
+configured mode-switch or auto-paste keys. This guarantees one terminal cell per label across
+supported environments. If any label is invalid, the entire custom set is ignored and the
+default labels are used.
 
 Examples:
 

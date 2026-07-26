@@ -78,6 +78,8 @@ def main():
             logger.log_section("Configuration Settings")
             if config.mode_switch_key_fell_back:
                 logger.log("Invalid mode switch key; falling back to ','")
+            if config.label_characters_fell_back:
+                logger.log("Invalid label characters; falling back to default labels")
             logger.log_dict(
                 {
                     "reverse_search": config.reverse_search,

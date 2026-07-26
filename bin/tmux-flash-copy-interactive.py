@@ -91,6 +91,8 @@ class InteractiveUI:
         )
         if self.debug_logger and self.debug_logger.enabled and config.mode_switch_key_fell_back:
             self.debug_logger.log("Invalid mode switch key; falling back to ','")
+        if self.debug_logger and self.debug_logger.enabled and config.label_characters_fell_back:
+            self.debug_logger.log("Invalid label characters; falling back to default labels")
 
     def _update_search(self, new_query: str):
         """

@@ -167,8 +167,7 @@ class PopupUI:
             "true" if self.config.debug_enabled else "false",
             "--debug-log-file",
             DebugLogger.get_instance().log_file if self.config.debug_enabled else "",
-            "--label-characters",
-            self.config.label_characters or "",
+            f"--label-characters={self.config.label_characters or ''}",
             "--auto-paste",
             "true" if self.config.auto_paste_enable else "false",
             "--idle-timeout",
@@ -204,13 +203,11 @@ class PopupUI:
                     "Could not initialize popup snapshot transport"
                 ) from error
 
-            # Run the popup command - it will close automatically with -E flag when script exits
-            # Timeout slightly longer than child's idle timeout (35s vs 30s child timeout)
-            # to allow child to exit gracefully before parent kills it
+            # The interactive child owns idle expiry because user input resets its
+            # timer. A fixed parent timeout would cancel otherwise-active sessions.
             result = subprocess.run(
                 popup_cmd,
                 check=False,
-                timeout=35.0,
             )
 
             if logger.enabled:
