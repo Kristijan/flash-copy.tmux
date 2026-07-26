@@ -4,7 +4,6 @@ Uses tmux's built-in OSC52 support to copy to the system clipboard,
 with native system tools (pbcopy/xclip) as fallbacks when available.
 """
 
-import contextlib
 import os
 import sys
 import uuid
@@ -108,28 +107,51 @@ class Clipboard:
             logger: Optional DebugLogger instance for logging
 
         Returns:
-            True if copy succeeded (paste failures are silent)
+            True if every requested operation succeeded
         """
         # Copy to clipboard first
         if not Clipboard.copy(text, logger=logger):
             return False
 
-        # Optionally paste to pane
-        if auto_paste and pane_id:
-            paste_buffer = f"__tmux_flash_copy_paste_{uuid.uuid4().hex}__"
-            try:
-                SubprocessUtils.run_command_quiet(["tmux", "set-buffer", "-b", paste_buffer, text])
-                SubprocessUtils.run_command_quiet(
+        if not auto_paste:
+            return True
+        if not pane_id:
+            if logger:
+                logger.log("Auto-paste: Failed - no target pane")
+            return False
+
+        paste_buffer = f"__tmux_flash_copy_paste_{uuid.uuid4().hex}__"
+        operation_succeeded = False
+        try:
+            buffer_written = SubprocessUtils.run_command_quiet(
+                ["tmux", "set-buffer", "-b", paste_buffer, text]
+            )
+            if not buffer_written:
+                if logger:
+                    logger.log(f"Auto-paste to pane {pane_id}: Failed to write buffer")
+            else:
+                operation_succeeded = SubprocessUtils.run_command_quiet(
                     ["tmux", "paste-buffer", "-b", paste_buffer, "-t", pane_id]
                 )
-                if logger:
-                    logger.log(f"Auto-paste to pane {pane_id}: Success")
-            except Exception:
-                if logger:
-                    logger.log(f"Auto-paste to pane {pane_id}: Failed")
-                pass  # Silent fail on paste errors
-            finally:
-                with contextlib.suppress(Exception):
-                    SubprocessUtils.run_command_quiet(["tmux", "delete-buffer", "-b", paste_buffer])
+            if buffer_written and not operation_succeeded and logger:
+                logger.log(f"Auto-paste to pane {pane_id}: Failed")
+        except Exception:
+            if logger:
+                logger.log(f"Auto-paste to pane {pane_id}: Failed")
+            operation_succeeded = False
 
-        return True
+        try:
+            cleanup_succeeded = SubprocessUtils.run_command_quiet(
+                ["tmux", "delete-buffer", "-b", paste_buffer]
+            )
+        except Exception:
+            cleanup_succeeded = False
+
+        if not cleanup_succeeded:
+            if logger:
+                logger.log(f"Auto-paste to pane {pane_id}: Failed to clean buffer")
+            return False
+
+        if operation_succeeded and logger:
+            logger.log(f"Auto-paste to pane {pane_id}: Success")
+        return operation_succeeded

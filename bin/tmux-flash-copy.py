@@ -173,9 +173,11 @@ def main():
         if result:
             # Copy to clipboard and optionally paste
             logger = DebugLogger.get_instance() if config.debug_enabled else None
-            clipboard.copy_and_paste(
+            operation_succeeded = clipboard.copy_and_paste(
                 result, pane_id=pane_id, auto_paste=should_paste, logger=logger
             )
+            if not operation_succeeded:
+                raise RuntimeError("Clipboard copy/paste operation failed")
 
     except KeyboardInterrupt:
         print("\nSearch cancelled", file=sys.stderr)
