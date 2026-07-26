@@ -4,8 +4,10 @@ Uses tmux's built-in OSC52 support (tmux 3.2+) to copy to system clipboard,
 with native system tools (pbcopy/xclip) as fallbacks when available.
 """
 
+import contextlib
 import os
 import sys
+import uuid
 
 from src.utils import SubprocessUtils
 
@@ -114,10 +116,11 @@ class Clipboard:
 
         # Optionally paste to pane
         if auto_paste and pane_id:
+            paste_buffer = f"__tmux_flash_copy_paste_{uuid.uuid4().hex}__"
             try:
-                SubprocessUtils.run_command_quiet(["tmux", "set-buffer", "-b", "flash-paste", text])
+                SubprocessUtils.run_command_quiet(["tmux", "set-buffer", "-b", paste_buffer, text])
                 SubprocessUtils.run_command_quiet(
-                    ["tmux", "paste-buffer", "-b", "flash-paste", "-t", pane_id]
+                    ["tmux", "paste-buffer", "-b", paste_buffer, "-t", pane_id]
                 )
                 if logger:
                     logger.log(f"Auto-paste to pane {pane_id}: Success")
@@ -125,5 +128,8 @@ class Clipboard:
                 if logger:
                     logger.log(f"Auto-paste to pane {pane_id}: Failed")
                 pass  # Silent fail on paste errors
+            finally:
+                with contextlib.suppress(Exception):
+                    SubprocessUtils.run_command_quiet(["tmux", "delete-buffer", "-b", paste_buffer])
 
         return True

@@ -27,6 +27,7 @@ from src.clipboard import Clipboard  # noqa: E402
 from src.config import ConfigLoader, FlashCopyConfig  # noqa: E402
 from src.debug_logger import DebugLogger  # noqa: E402
 from src.pane_capture import PaneCapture  # noqa: E402
+from src.popup_protocol import PopupExitCode  # noqa: E402
 from src.range_selection import ActiveRange  # noqa: E402
 from src.search_interface import SearchInterface, SearchMatch  # noqa: E402
 
@@ -45,6 +46,7 @@ class InteractiveUI:
         pane_content: str,
         dimensions: dict,
         config: FlashCopyConfig,
+        result_buffer: str | None = None,
     ):
         """
         Initialise the interactive UI.
@@ -54,6 +56,7 @@ class InteractiveUI:
             pane_content: The captured pane content
             dimensions: Pane dimensions dict
             config: FlashCopyConfig with all configuration options
+            result_buffer: Invocation-specific tmux buffer for the result
         """
         self.pane_id = pane_id
         self.pane_content = pane_content
@@ -61,6 +64,7 @@ class InteractiveUI:
         self.pane_content_plain = AnsiUtils.strip_ansi_codes(pane_content)
         self.dimensions = dimensions
         self.config = config
+        self.result_buffer = result_buffer
         # Use plain text for searching
         self.search_interface = SearchInterface(
             self.pane_content_plain,
@@ -760,16 +764,19 @@ class InteractiveUI:
         """
         logger = DebugLogger.get_instance()
 
-        # Store result in a tmux buffer for parent to read
-        # Use pane-specific buffer name to avoid conflicts with concurrent instances
-        result_buffer = f"__tmux_flash_copy_result_{self.pane_id}__"
+        if self.result_buffer is None:
+            raise RuntimeError("Result buffer was not provided by the popup parent")
+
+        if not text:
+            sys.exit(PopupExitCode.CANCEL)
+
         try:
             if logger.enabled:
                 logger.log(f"Writing result to tmux buffer (length: {len(text)})")
                 logger.log(f"Auto-paste: {should_paste}")
 
             result = subprocess.run(
-                ["tmux", "set-buffer", "-b", result_buffer, text],
+                ["tmux", "set-buffer", "-b", self.result_buffer, text],
                 check=True,
                 capture_output=True,
             )
@@ -783,7 +790,7 @@ class InteractiveUI:
             sys.exit(1)
 
         # Use exit code to communicate paste flag: 10 for paste, 0 for copy
-        exit_code = 10 if should_paste else 0
+        exit_code = PopupExitCode.PASTE if should_paste else PopupExitCode.COPY
         if logger.enabled:
             logger.log(f"Exiting with code {exit_code}")
         sys.exit(exit_code)
@@ -793,6 +800,16 @@ def main():
     """Main entry point for the interactive UI."""
     parser = argparse.ArgumentParser(description="Interactive search UI for tmux-flash-copy")
     parser.add_argument("--pane-id", required=True, help="The tmux pane ID")
+    parser.add_argument(
+        "--pane-content-buffer",
+        required=True,
+        help="Invocation-specific tmux buffer containing the captured pane",
+    )
+    parser.add_argument(
+        "--result-buffer",
+        required=True,
+        help="Invocation-specific tmux buffer for returning the selection",
+    )
     parser.add_argument(
         "--reverse-search", default="True", help="Enable reverse search (bottom to top)"
     )
@@ -858,27 +875,18 @@ def main():
     args = parser.parse_args()
 
     try:
-        # Try to read pane content from buffer first (optimization to avoid redundant capture)
-        # Use pane-specific buffer name to avoid conflicts with concurrent instances
-        pane_content = None
-        pane_content_buffer = f"__tmux_flash_copy_pane_content_{args.pane_id}__"
-        try:
-            buffer_result = subprocess.run(
-                ["tmux", "show-buffer", "-b", pane_content_buffer],
-                capture_output=True,
-                text=True,
-                check=True,
-                timeout=5,
-            )
-            if buffer_result.returncode == 0 and buffer_result.stdout:
-                pane_content = buffer_result.stdout
-        except (subprocess.SubprocessError, OSError):
-            pass
+        # Use only the immutable snapshot prepared by the parent. Recapturing here
+        # would silently search different content after a transport failure.
+        buffer_result = subprocess.run(
+            ["tmux", "show-buffer", "-b", args.pane_content_buffer],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=5,
+        )
+        pane_content = buffer_result.stdout
 
-        # Fall back to capturing if buffer read failed
         capture = PaneCapture(args.pane_id)
-        if pane_content is None:
-            pane_content = capture.capture_pane()
 
         # Get pane dimensions
         dimensions = capture.get_pane_dimensions()
@@ -914,7 +922,13 @@ def main():
             logger.log(f"Pane dimensions: {dimensions}")
 
         # Run interactive UI
-        ui = InteractiveUI(args.pane_id, pane_content, dimensions, config)
+        ui = InteractiveUI(
+            args.pane_id,
+            pane_content,
+            dimensions,
+            config,
+            result_buffer=args.result_buffer,
+        )
         ui.run()
 
         # Exit explicitly to close the popup
@@ -925,6 +939,7 @@ def main():
 
         error_msg = f"Error: {e}\n{traceback.format_exc()}"
         print(error_msg, file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

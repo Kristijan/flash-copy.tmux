@@ -1,7 +1,7 @@
 """Tests for clipboard module."""
 
 import sys
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 from src.clipboard import Clipboard
 
@@ -166,8 +166,27 @@ class TestClipboard:
 
         assert result is True
         mock_copy.assert_called_once()
-        # Should be called twice: once for set-buffer, once for paste-buffer
-        assert mock_run.call_count == 2
+        # Set, paste, then cleanup the invocation-specific buffer.
+        assert mock_run.call_count == 3
+
+    @patch("src.clipboard.uuid.uuid4")
+    @patch("src.clipboard.Clipboard.copy")
+    @patch("src.clipboard.SubprocessUtils.run_command_quiet")
+    def test_auto_paste_uses_and_cleans_an_invocation_specific_buffer(
+        self, mock_run, mock_copy, mock_uuid, mock_tmux_env
+    ):
+        mock_copy.return_value = True
+        mock_run.return_value = True
+        mock_uuid.return_value.hex = "invocation"
+
+        assert Clipboard.copy_and_paste("test text", pane_id="%0", auto_paste=True) is True
+
+        paste_buffer = "__tmux_flash_copy_paste_invocation__"
+        assert mock_run.call_args_list == [
+            call(["tmux", "set-buffer", "-b", paste_buffer, "test text"]),
+            call(["tmux", "paste-buffer", "-b", paste_buffer, "-t", "%0"]),
+            call(["tmux", "delete-buffer", "-b", paste_buffer]),
+        ]
 
     @patch("src.clipboard.Clipboard.copy")
     @patch("src.clipboard.SubprocessUtils.run_command_quiet")

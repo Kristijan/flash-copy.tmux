@@ -1,22 +1,29 @@
 """Interaction tests for the two-stage range selection flow."""
 
 import importlib.util
+import subprocess
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from src.ansi_utils import AnsiUtils
 from src.config import FlashCopyConfig
+from src.popup_protocol import PopupExitCode
 
 
-def load_interactive_ui():
+def load_interactive_module():
     script_path = Path(__file__).resolve().parents[1] / "bin" / "tmux-flash-copy-interactive.py"
     spec = importlib.util.spec_from_file_location("range_interactive_ui", str(script_path))
     if spec is None or spec.loader is None:
         raise RuntimeError(f"Failed to load module spec for {script_path}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module.InteractiveUI
+    return module
+
+
+def load_interactive_ui():
+    return load_interactive_module().InteractiveUI
 
 
 def run_keys(monkeypatch, ui, keys):
@@ -36,6 +43,81 @@ def run_keys(monkeypatch, ui, keys):
     with pytest.raises(SystemExit):
         ui.run()
     return selections
+
+
+def test_selection_is_written_to_the_parent_result_channel():
+    interactive_cls = load_interactive_ui()
+    result_buffer = "__tmux_flash_copy_result_invocation__"
+    ui = interactive_cls(
+        "pane",
+        "hello world",
+        {},
+        FlashCopyConfig(),
+        result_buffer=result_buffer,
+    )
+
+    with (
+        patch("subprocess.run", return_value=MagicMock(returncode=0)) as mock_run,
+        pytest.raises(SystemExit) as exit_info,
+    ):
+        ui._save_result("hello", should_paste=True)
+
+    assert exit_info.value.code == 10
+    mock_run.assert_called_once_with(
+        ["tmux", "set-buffer", "-b", result_buffer, "hello"],
+        check=True,
+        capture_output=True,
+    )
+
+
+def test_cancel_exits_without_creating_a_result_buffer():
+    interactive_cls = load_interactive_ui()
+    ui = interactive_cls(
+        "pane",
+        "hello world",
+        {},
+        FlashCopyConfig(),
+        result_buffer="__tmux_flash_copy_result_invocation__",
+    )
+
+    with (
+        patch("subprocess.run") as mock_run,
+        pytest.raises(SystemExit) as exit_info,
+    ):
+        ui._save_result("", should_paste=False)
+
+    assert exit_info.value.code == PopupExitCode.CANCEL
+    mock_run.assert_not_called()
+
+
+def test_child_snapshot_read_failure_does_not_recapture_live_pane(monkeypatch):
+    module = load_interactive_module()
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "tmux-flash-copy-interactive.py",
+            "--pane-id",
+            "%1",
+            "--pane-content-buffer",
+            "__snapshot__",
+            "--result-buffer",
+            "__result__",
+        ],
+    )
+    monkeypatch.setattr(
+        module.subprocess,
+        "run",
+        MagicMock(side_effect=subprocess.CalledProcessError(1, ["tmux", "show-buffer"])),
+    )
+    capture_live_pane = MagicMock(return_value="newer live content")
+    monkeypatch.setattr(module.PaneCapture, "capture_pane", capture_live_pane)
+    monkeypatch.setattr(module.InteractiveUI, "run", MagicMock())
+
+    with pytest.raises(SystemExit) as exit_info:
+        module.main()
+
+    assert exit_info.value.code == 1
+    capture_live_pane.assert_not_called()
 
 
 def test_user_can_select_a_range_with_two_labelled_searches(monkeypatch):

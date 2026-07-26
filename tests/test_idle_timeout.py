@@ -61,6 +61,7 @@ def mock_ui(mock_config):
         pane_content=pane_content,
         dimensions=dimensions,
         config=mock_config,
+        result_buffer="__tmux_flash_copy_result_test__",
     )
 
 
