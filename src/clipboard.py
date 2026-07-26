@@ -1,6 +1,6 @@
 """Clipboard module for tmux environments.
 
-Uses tmux's built-in OSC52 support (tmux 3.2+) to copy to system clipboard,
+Uses tmux's built-in OSC52 support to copy to the system clipboard,
 with native system tools (pbcopy/xclip) as fallbacks when available.
 """
 
@@ -23,7 +23,7 @@ class Clipboard:
         """Use tmux set-buffer -w to copy via OSC52.
 
         The -w flag tells tmux to send the buffer to the system clipboard
-        via OSC52 passthrough (requires tmux 3.2+ and terminal OSC52 support).
+        via OSC52 passthrough (requires terminal OSC52 support).
         """
         return SubprocessUtils.run_command_quiet(["tmux", "set-buffer", "-w", "--", text])
 
@@ -63,7 +63,7 @@ class Clipboard:
                 logger.log("Clipboard: Failed - not in tmux")
             return False
 
-        # Try tmux OSC52 passthrough first (tmux 3.2+)
+        # Try tmux OSC52 passthrough first
         if Clipboard._tmux_osc52(text):
             if logger:
                 logger.log("Clipboard: Success via tmux OSC52")

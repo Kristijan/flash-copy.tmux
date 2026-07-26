@@ -58,7 +58,7 @@ A tmux plugin inspired by [flash.nvim](https://github.com/folke/flash.nvim) that
 
 ## Requirements
 
-- [tmux](https://github.com/tmux/tmux) 3.2+ (tested with tmux 3.7b)
+- [tmux](https://github.com/tmux/tmux) 3.6b+ (tested with tmux 3.7b)
 - [Python](https://www.python.org) 3.10+ (tested with Python 3.14.6)
 
 ## Installation

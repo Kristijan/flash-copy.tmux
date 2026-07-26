@@ -90,7 +90,8 @@ uv run pytest --cov=src --cov-report=term-missing
 - Word boundaries use tmux's `word-separators` option by default, overrideable via `@flash-copy-word-separators`
 - Labels are assigned to matches in order determined by `@flash-copy-reverse-search` (bottom-to-top or top-to-bottom)
 - Search is dynamic - updates as user types, with real-time label reassignment
-- Clipboard operations use OSC52 (tmux 3.2+) as primary method, falling back to system tools
+- The plugin requires tmux 3.6b+; clipboard operations use OSC52 as the primary method,
+  falling back to system tools
 
 ### tmux Integration
 

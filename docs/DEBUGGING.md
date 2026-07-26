@@ -309,7 +309,7 @@ Look for pane dimensions and positions.
 
 **Solution**:
 
-1. Check tmux version: `tmux -V` (should be 3.2+)
+1. Check tmux version: `tmux -V` (should be 3.6b+)
 2. Verify pane dimensions match your expectations
 
 ### Issue: Labels not appearing
