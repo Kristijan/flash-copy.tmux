@@ -2,6 +2,12 @@
 
 This file provides guidance to coding agents, such as Codex and Copilot, when working with code in this repository.
 
+## Maintaining agent instructions
+
+Keep `AGENTS.md` and `CLAUDE.md` updated in tandem. When changing shared project guidance
+in either file, propagate the same change to the other file. Preserve audience-specific
+wording only where the instructions genuinely differ between coding agents.
+
 ## Project Overview
 
 tmux-flash-copy is a tmux plugin inspired by flash.nvim that enables searching visible words in the current tmux pane and copying them to the clipboard using keyboard label shortcuts. The project is written in Python 3.10+ and integrates with tmux's OSC52 clipboard support.
@@ -113,7 +119,7 @@ Word separators should only apply to the text that is copied to the clipboard, a
 
 As an example.
 String: tmux bind-key "${bind_key}" run-shell "${PLUGIN_DIR}/bin/tmux-flash-copy.py"
-Configured word separators: ' ()":,;<>~!@#$%^&\*|+=[]{}?`''
+Configured word separators: ' ()":,;<>~!@#$%^&*|+=[]{}?`''
 
 I should be able to search for ${b and it apply a label to "${bind_key}". If that label is selected, only the word bind_key should be copied.
 
@@ -144,3 +150,19 @@ Project uses ruff with:
 - Python 3.10+ target
 - Import sorting via isort
 - Multiple linting rules enabled (see pyproject.toml)
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked as local Markdown under `.scratch/<feature>/`. See
+`docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Triage state uses the five default canonical role strings. See
+`docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Domain documentation uses a single-context layout. See `docs/agents/domain.md`.

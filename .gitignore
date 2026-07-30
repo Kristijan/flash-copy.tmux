@@ -149,3 +149,4 @@ cython_debug/
 
 # tmux-flash-copy specific
 .tmux-flash-copy-debug.log*
+.scratch/
