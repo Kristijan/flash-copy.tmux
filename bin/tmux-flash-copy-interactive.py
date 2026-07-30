@@ -397,8 +397,8 @@ class InteractiveUI:
             marker_start = max(0, endpoint.copy_start_col)
             marker_end = min(len(line_plain), endpoint.copy_end_col)
         else:
-            marker_start = max(0, endpoint.col - 1)
-            marker_end = min(len(line_plain), marker_start + 1)
+            marker_start = max(0, endpoint.match_start_col)
+            marker_end = min(len(line_plain), endpoint.match_end_col)
 
         original_marker_end = AnsiUtils.map_position_to_coloured(display_line, marker_end)
         restored_style = AnsiUtils.get_active_style_at(display_line, original_marker_end)

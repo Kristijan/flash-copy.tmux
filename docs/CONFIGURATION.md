@@ -164,10 +164,10 @@ set -g @flash-copy-mode-switch-key "\\"
 Controls how the two range endpoints are expanded when copying.
 
 - `word`: Include the separator-defined word at each endpoint and everything between them.
-- `precise`: Copy from the final matched character before the first marker up to the second marker.
+- `precise`: Include the complete search query at each endpoint and everything between them.
 
 ```bash
-# Use exact marker boundaries instead of whole endpoint words
+# Use matched query boundaries instead of whole endpoint words
 set -g @flash-copy-range-copy-mode "precise"
 ```
 

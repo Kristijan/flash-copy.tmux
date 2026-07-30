@@ -159,7 +159,7 @@ Set `@flash-copy-mode` to `range` to start every invocation in range mode. The f
 
 For example, endpoints shown as `he<M1>lo w<M2>rld` copy `hello world`. The entire word `hello` is highlighted while the second endpoint is pending. Separators outside the endpoint words are excluded, while separators and newlines between those words are preserved.
 
-Set `@flash-copy-range-copy-mode` to `precise` to use the exact marker boundaries instead. In the same example, precise mode copies `ello w` and highlights the initial `e`. Press `;` before the second label or `Enter` to copy and auto-paste the completed range.
+Set `@flash-copy-range-copy-mode` to `precise` to include the complete search query at each endpoint instead of expanding to whole words. In the same example, precise mode copies `hello w` and highlights the complete first query, `he`, while the second endpoint is pending. Press `;` before the second label or `Enter` to copy and auto-paste the completed range.
 
 The mode-switch key is searchable during the second search. To search for it during the first search, disable range selection or configure a different key.
 

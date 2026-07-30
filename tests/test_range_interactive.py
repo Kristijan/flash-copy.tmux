@@ -249,7 +249,7 @@ def test_user_can_select_a_precise_range_when_configured(monkeypatch):
 
     selections = run_keys(monkeypatch, ui, ["h", "e", ",", "a", "w", "s"])
 
-    assert selections == [("ello w", False)]
+    assert selections == [("hello w", False)]
 
 
 def test_second_endpoint_can_be_above_the_first_and_auto_paste_at_completion(monkeypatch):
@@ -357,7 +357,7 @@ def test_word_range_highlights_the_entire_pinned_endpoint_word(monkeypatch, caps
     assert search_bar.startswith(f"{ui.config.prompt_colour}range")
 
 
-def test_precise_range_highlights_the_first_character_that_will_be_copied(monkeypatch, capsys):
+def test_precise_range_highlights_the_complete_pinned_query(monkeypatch, capsys):
     interactive_cls = load_interactive_ui()
     config = FlashCopyConfig(reverse_search=False, range_copy_mode="precise")
     ui = interactive_cls("pane", "hello world", {}, config)
@@ -370,7 +370,7 @@ def test_precise_range_highlights_the_first_character_that_will_be_copied(monkey
     rendered_line = capsys.readouterr().err
 
     assert AnsiUtils.strip_ansi_codes(rendered_line) == "hello world"
-    assert "\033[30m\033[45me\033[0m" in rendered_line
+    assert "\033[30m\033[45mhe\033[0m" in rendered_line
 
 
 def test_pinned_highlight_restores_the_pane_style_after_the_marked_span(monkeypatch):
@@ -383,3 +383,16 @@ def test_pinned_highlight_restores_the_pane_style_after_the_marked_span(monkeypa
     rendered_line = ui._overlay_pinned_endpoint("\033[31mhello world\033[0m", 0, "hello world")
 
     assert "\033[0m\033[31m world" in rendered_line
+
+
+def test_precise_pinned_highlight_restores_the_pane_style_after_the_query(monkeypatch):
+    interactive_cls = load_interactive_ui()
+    config = FlashCopyConfig(reverse_search=False, range_copy_mode="precise")
+    ui = interactive_cls("pane", "hello world", {}, config)
+    monkeypatch.setattr(ui, "_display_content", lambda: None)
+    ui._update_search("he")
+    ui._begin_range(ui.current_matches[0])
+
+    rendered_line = ui._overlay_pinned_endpoint("\033[31mhello world\033[0m", 0, "hello world")
+
+    assert "\033[0m\033[31mllo world" in rendered_line
