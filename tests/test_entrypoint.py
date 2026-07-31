@@ -21,7 +21,6 @@ def load_entrypoint_module():
 
 def test_entrypoint_propagates_copy_or_paste_failure(monkeypatch, capsys):
     module = load_entrypoint_module()
-    monkeypatch.setattr(module, "get_tmux_pane_id", lambda: "%1")
     monkeypatch.setattr(module.ConfigLoader, "load_all_flash_copy_config", FlashCopyConfig)
 
     capture = MagicMock()
@@ -37,7 +36,16 @@ def test_entrypoint_propagates_copy_or_paste_failure(monkeypatch, capsys):
     monkeypatch.setattr(module, "Clipboard", MagicMock(return_value=clipboard))
 
     with pytest.raises(SystemExit) as exit_info:
-        module.main()
+        module.main("%1", "client-1")
 
     assert exit_info.value.code == 1
     assert "Clipboard copy/paste operation failed" in capsys.readouterr().err
+    module.PopupUI.assert_called_once()
+    assert module.PopupUI.call_args.kwargs["client_name"] == "client-1"
+    clipboard.copy_and_paste.assert_called_once_with(
+        "visible",
+        pane_id="%1",
+        client_name="client-1",
+        auto_paste=True,
+        logger=None,
+    )

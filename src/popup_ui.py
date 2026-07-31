@@ -32,6 +32,7 @@ class PopupUI:
         clipboard: Clipboard,
         pane_id: str,
         config: FlashCopyConfig,
+        client_name: str | None = None,
     ):
         """
         Initialise the popup UI.
@@ -42,11 +43,13 @@ class PopupUI:
             clipboard: Clipboard instance for copying
             pane_id: The tmux pane ID
             config: FlashCopyConfig with all configuration options
+            client_name: The tmux client that launched the popup
         """
         self.pane_content = pane_content
         self.search_interface = search_interface
         self.clipboard = clipboard
         self.pane_id = pane_id
+        self.client_name = client_name
         self.config = config
         self.search_query = ""
         self.current_matches: list[SearchMatch] = []
@@ -187,6 +190,8 @@ class PopupUI:
             "--range-marker-bg-colour",
             self.config.range_marker_bg_colour,
         ]
+        if self.client_name:
+            popup_cmd[2:2] = ["-t", self.client_name]
 
         logger = DebugLogger.get_instance()
 

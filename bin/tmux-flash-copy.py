@@ -6,7 +6,7 @@ Inspired by flash.nvim, this plugin allows you to search visible text in the
 current tmux pane, label it with keyboard shortcuts, and copy it to the clipboard.
 """
 
-import subprocess
+import argparse
 import sys
 from pathlib import Path
 
@@ -33,29 +33,9 @@ from src.popup_ui import PopupUI  # noqa: E402
 from src.search_interface import SearchInterface  # noqa: E402
 
 
-def get_tmux_pane_id():
-    """Get the current active tmux pane ID."""
-    try:
-        result = subprocess.run(
-            ["tmux", "display-message", "-p", "#{pane_id}"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        pane_id = result.stdout.strip()
-        return pane_id
-    except subprocess.CalledProcessError as e:
-        error_msg = f"Error getting pane ID: {e}"
-        print(error_msg, file=sys.stderr)
-        sys.exit(1)
-
-
-def main():
+def main(pane_id: str, client_name: str):
     """Main entry point for the tmux-flash-copy plugin."""
     try:
-        # Get the current pane ID
-        pane_id = get_tmux_pane_id()
-
         # Capture pane contents
         capture = PaneCapture(pane_id)
         pane_content = capture.capture_pane()
@@ -72,6 +52,7 @@ def main():
             logger.log(f"Python: {get_python_version()}")
             logger.log(f"Tmux: {get_tmux_version()}")
             logger.log(f"Pane ID: {pane_id}")
+            logger.log(f"Client: {client_name}")
             logger.log(f"Log file: {logger.log_file}")
 
             # Log all configuration
@@ -164,6 +145,7 @@ def main():
             search_interface=search,
             clipboard=clipboard,
             pane_id=pane_id,
+            client_name=client_name,
             config=config,
         )
 
@@ -174,7 +156,11 @@ def main():
             # Copy to clipboard and optionally paste
             logger = DebugLogger.get_instance() if config.debug_enabled else None
             operation_succeeded = clipboard.copy_and_paste(
-                result, pane_id=pane_id, auto_paste=should_paste, logger=logger
+                result,
+                pane_id=pane_id,
+                client_name=client_name,
+                auto_paste=should_paste,
+                logger=logger,
             )
             if not operation_succeeded:
                 raise RuntimeError("Clipboard copy/paste operation failed")
@@ -191,4 +177,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--pane-id", required=True)
+    parser.add_argument("--client-name", required=True)
+    args = parser.parse_args()
+    main(args.pane_id, args.client_name)

@@ -18,13 +18,17 @@ class Clipboard:
     """
 
     @staticmethod
-    def _tmux_osc52(text: str) -> bool:
+    def _tmux_osc52(text: str, client_name: str | None = None) -> bool:
         """Use tmux set-buffer -w to copy via OSC52.
 
         The -w flag tells tmux to send the buffer to the system clipboard
         via OSC52 passthrough (requires terminal OSC52 support).
         """
-        return SubprocessUtils.run_command_quiet(["tmux", "set-buffer", "-w", "--", text])
+        command = ["tmux", "set-buffer", "-w"]
+        if client_name:
+            command.extend(["-t", client_name])
+        command.extend(["--", text])
+        return SubprocessUtils.run_command_quiet(command)
 
     @staticmethod
     def _pbcopy(text: str) -> bool:
@@ -47,12 +51,13 @@ class Clipboard:
         return SubprocessUtils.run_command_quiet(["tmux", "set-buffer", "--", text])
 
     @staticmethod
-    def copy(text: str, logger=None) -> bool:
+    def copy(text: str, logger=None, client_name: str | None = None) -> bool:
         """Copy text to clipboard using available methods.
 
         Args:
             text: Text to copy
             logger: Optional DebugLogger instance for logging
+            client_name: Explicit tmux client target for OSC52 delivery
 
         Returns True on success, False on failure.
         """
@@ -63,7 +68,7 @@ class Clipboard:
             return False
 
         # Try tmux OSC52 passthrough first
-        if Clipboard._tmux_osc52(text):
+        if Clipboard._tmux_osc52(text, client_name):
             if logger:
                 logger.log("Clipboard: Success via tmux OSC52")
             return True
@@ -96,13 +101,18 @@ class Clipboard:
 
     @staticmethod
     def copy_and_paste(
-        text: str, pane_id: str | None = None, auto_paste: bool = False, logger=None
+        text: str,
+        pane_id: str | None = None,
+        client_name: str | None = None,
+        auto_paste: bool = False,
+        logger=None,
     ) -> bool:
         """Copy text to clipboard and optionally paste to pane.
 
         Args:
             text: Text to copy
             pane_id: Target pane ID for paste (required if auto_paste=True)
+            client_name: Explicit tmux client target for OSC52 delivery
             auto_paste: If True, paste text to pane after copying
             logger: Optional DebugLogger instance for logging
 
@@ -110,7 +120,7 @@ class Clipboard:
             True if every requested operation succeeded
         """
         # Copy to clipboard first
-        if not Clipboard.copy(text, logger=logger):
+        if not Clipboard.copy(text, logger=logger, client_name=client_name):
             return False
 
         if not auto_paste:

@@ -22,7 +22,17 @@ class TestClipboard:
         result = Clipboard.copy("test text")
 
         assert result is True
-        mock_osc52.assert_called_once_with("test text")
+        mock_osc52.assert_called_once_with("test text", None)
+
+    @patch("src.clipboard.SubprocessUtils.run_command_quiet")
+    def test_tmux_osc52_targets_launching_client(self, mock_run):
+        mock_run.return_value = True
+
+        assert Clipboard._tmux_osc52("test text", "client-1") is True
+
+        mock_run.assert_called_once_with(
+            ["tmux", "set-buffer", "-w", "-t", "client-1", "--", "test text"]
+        )
 
     @patch("src.clipboard.Clipboard._tmux_osc52")
     @patch("src.clipboard.Clipboard._pbcopy")

@@ -20,5 +20,7 @@ get_tmux_option() {
 # Get the key binding from user config or use default
 bind_key=$(get_tmux_option "@flash-copy-bind-key" "F")
 
-# Bind the key to trigger the flash-copy interactive mode
-tmux bind-key "${bind_key}" run-shell "${PLUGIN_DIR}/bin/tmux-flash-copy.py"
+# Bind the key to trigger the flash-copy interactive mode. Capture runtime identity
+# while tmux still has the key event's pane and client context.
+tmux bind-key "${bind_key}" run-shell \
+    "\"${PLUGIN_DIR}/bin/tmux-flash-copy.py\" --pane-id \"#{pane_id}\" --client-name \"#{client_name}\""
