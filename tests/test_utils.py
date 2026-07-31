@@ -232,7 +232,7 @@ class TestTmuxPaneUtils:
 
         assert result == {
             "x": 40,
-            "y": 36,  # For non-top panes, y = bottom + 1
+            "y": 12,
             "width": 80,
             "height": 24,
         }
@@ -274,7 +274,7 @@ class TestTmuxPaneUtils:
 
         assert result == {
             "x": 10,
-            "y": 15,  # bottom + 1
+            "y": 5,
             "width": 20,
             "height": 10,
         }

@@ -494,102 +494,28 @@ class TestPopupUIErrorHandling:
     @patch("src.popup_ui.subprocess.run")
     @patch("src.popup_ui.TmuxPaneUtils.get_pane_dimensions")
     @patch("src.popup_ui.DebugLogger.get_instance")
-    def test_popup_dimensions_fallback_on_none(
+    def test_popup_aborts_when_targeted_pane_geometry_is_unavailable(
         self, mock_get_instance, mock_get_dims, mock_subprocess
     ):
-        """Test fallback to tmux window dimensions when pane dimensions unavailable."""
         mock_logger = MagicMock()
         mock_logger.log_file = ""
         mock_get_instance.return_value = mock_logger
-
-        # Return None to trigger fallback
         mock_get_dims.return_value = None
-
-        # Mock subprocess.run to handle different commands
-        def subprocess_side_effect(cmd, **kwargs):
-            result = MagicMock()
-            result.returncode = 0
-            if "display-message" in cmd:
-                result.stdout = "200,50"
-            elif "save-buffer" in cmd:
-                result.stdout = "test result"
-            else:
-                result.stdout = ""
-            return result
-
-        mock_subprocess.side_effect = subprocess_side_effect
-
-        config = FlashCopyConfig()
-        clipboard = MagicMock(spec=Clipboard)
         search_interface = MagicMock(spec=SearchInterface)
         search_interface.reverse_search = True
         search_interface.word_separators = ""
-        search_interface.case_sensitive = False
-
         popup_ui = PopupUI(
             pane_content="test content",
             search_interface=search_interface,
-            clipboard=clipboard,
+            clipboard=MagicMock(spec=Clipboard),
             pane_id="test_pane",
-            config=config,
+            config=FlashCopyConfig(),
         )
 
-        popup_ui._launch_popup()
+        with pytest.raises(PopupExecutionError, match="geometry for pane test_pane"):
+            popup_ui._launch_popup()
 
-        # Verify subprocess was called for tmux query
-        assert mock_subprocess.called
-        first_call = mock_subprocess.call_args_list[0][0][0]
-        assert "display-message" in first_call
-
-    @patch("src.popup_ui.subprocess.run")
-    @patch("src.popup_ui.TmuxPaneUtils.get_pane_dimensions")
-    @patch("src.popup_ui.DebugLogger.get_instance")
-    def test_popup_dimensions_fallback_on_subprocess_error(
-        self, mock_get_instance, mock_get_dims, mock_subprocess
-    ):
-        """Test fallback to hardcoded dimensions on subprocess error."""
-        mock_logger = MagicMock()
-        mock_logger.log_file = ""
-        mock_get_instance.return_value = mock_logger
-
-        mock_get_dims.return_value = None
-
-        # Mock subprocess to raise error on first call (display-message), succeed on others
-        call_count = [0]
-
-        def subprocess_side_effect(cmd, **kwargs):
-            call_count[0] += 1
-            if call_count[0] == 1 and "display-message" in cmd:
-                raise subprocess.CalledProcessError(1, "tmux")
-            result = MagicMock()
-            result.returncode = 0
-            if "save-buffer" in cmd:
-                result.stdout = "test result"
-            else:
-                result.stdout = ""
-            return result
-
-        mock_subprocess.side_effect = subprocess_side_effect
-
-        config = FlashCopyConfig()
-        clipboard = MagicMock(spec=Clipboard)
-        search_interface = MagicMock(spec=SearchInterface)
-        search_interface.reverse_search = True
-        search_interface.word_separators = ""
-        search_interface.case_sensitive = False
-
-        popup_ui = PopupUI(
-            pane_content="test content",
-            search_interface=search_interface,
-            clipboard=clipboard,
-            pane_id="test_pane",
-            config=config,
-        )
-
-        popup_ui._launch_popup()
-
-        # Should still call popup command with fallback dimensions
-        assert mock_subprocess.call_count >= 1
+        mock_subprocess.assert_not_called()
 
     @patch("src.popup_ui.subprocess.run")
     @patch("src.popup_ui.TmuxPaneUtils.get_pane_dimensions")

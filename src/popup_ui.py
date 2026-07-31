@@ -89,30 +89,16 @@ class PopupUI:
         # Get pane dimensions for seamless overlay positioning
         pane_dimensions = TmuxPaneUtils.get_pane_dimensions(self.pane_id)
 
-        if pane_dimensions:
-            # Calculate popup position to perfectly overlay the pane
-            popup_pos = TmuxPaneUtils.calculate_popup_position(pane_dimensions)
-            popup_x = popup_pos["x"]
-            popup_y = popup_pos["y"]
-            popup_width = popup_pos["width"]
-            popup_height = popup_pos["height"]
-        else:
-            # Fallback: Get window dimensions if pane dimensions unavailable
-            try:
-                result = subprocess.run(
-                    ["tmux", "display-message", "-p", "#{window_width},#{window_height}"],
-                    capture_output=True,
-                    text=True,
-                    check=True,
-                )
-                popup_width, popup_height = map(int, result.stdout.strip().split(","))
-                popup_x = 0
-                popup_y = 0
-            except (subprocess.SubprocessError, ValueError):
-                popup_width = 160
-                popup_height = 40
-                popup_x = 0
-                popup_y = 0
+        if pane_dimensions is None:
+            raise PopupExecutionError(f"Could not resolve popup geometry for pane {self.pane_id}")
+
+        # Geometry is fixed for the lifetime of this immutable snapshot. A resize
+        # applies to the next invocation rather than changing coordinates mid-search.
+        popup_pos = TmuxPaneUtils.calculate_popup_position(pane_dimensions)
+        popup_x = popup_pos["x"]
+        popup_y = popup_pos["y"]
+        popup_width = popup_pos["width"]
+        popup_height = popup_pos["height"]
 
         # Create a command that will be executed in the popup
         # We'll use a custom Python script for better control
