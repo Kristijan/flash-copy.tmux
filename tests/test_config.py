@@ -587,14 +587,11 @@ class TestConfigLoader:
     def test_get_word_separators_invalid_escape_sequence(self, mock_read_option, mock_read_window):
         """Test handling of invalid escape sequences in word-separators."""
         mock_read_option.return_value = ""
-        # Invalid escape sequence that causes ast.literal_eval to fail
-        mock_read_window.return_value = 'word-separators "\\x999"'
+        mock_read_window.return_value = r'word-separators "\xZZ"'
 
         result = ConfigLoader.get_word_separators()
 
-        # Should fall back to extracting between quotes without decoding
-        # The string is extracted as-is: \x999
-        assert result == "\x999"
+        assert result == r"\xZZ"
 
     @patch("src.config.ConfigLoader._read_tmux_window_option")
     @patch("src.config.ConfigLoader._read_tmux_option")
