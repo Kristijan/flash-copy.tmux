@@ -107,7 +107,7 @@ def test_child_snapshot_read_failure_does_not_recapture_live_pane(monkeypatch):
     monkeypatch.setattr(
         module.subprocess,
         "run",
-        MagicMock(side_effect=subprocess.CalledProcessError(1, ["tmux", "show-buffer"])),
+        MagicMock(side_effect=subprocess.CalledProcessError(1, ["tmux", "save-buffer"])),
     )
     capture_live_pane = MagicMock(return_value="newer live content")
     monkeypatch.setattr(module.PaneCapture, "capture_pane", capture_live_pane)
@@ -118,6 +118,43 @@ def test_child_snapshot_read_failure_does_not_recapture_live_pane(monkeypatch):
 
     assert exit_info.value.code == 1
     capture_live_pane.assert_not_called()
+
+
+def test_child_reads_snapshot_with_raw_save_buffer_transport(monkeypatch):
+    module = load_interactive_module()
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "tmux-flash-copy-interactive.py",
+            "--pane-id",
+            "%1",
+            "--pane-content-buffer",
+            "__snapshot__",
+            "--result-buffer",
+            "__result__",
+        ],
+    )
+    snapshot = "line with trailing spaces  \nfinal line\n\n"
+    run_command = MagicMock(return_value=MagicMock(stdout=snapshot))
+    monkeypatch.setattr(module.subprocess, "run", run_command)
+    pane_capture = MagicMock()
+    pane_capture.return_value.get_pane_dimensions.return_value = {"width": 80, "height": 24}
+    monkeypatch.setattr(module, "PaneCapture", pane_capture)
+    interactive_ui = MagicMock()
+    monkeypatch.setattr(module, "InteractiveUI", interactive_ui)
+
+    with pytest.raises(SystemExit) as exit_info:
+        module.main()
+
+    assert exit_info.value.code == 0
+    run_command.assert_called_once_with(
+        ["tmux", "save-buffer", "-b", "__snapshot__", "-"],
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=5,
+    )
+    assert interactive_ui.call_args.args[1] == snapshot
 
 
 def test_user_can_select_a_range_with_two_labelled_searches(monkeypatch):

@@ -880,7 +880,7 @@ def main():
         # Use only the immutable snapshot prepared by the parent. Recapturing here
         # would silently search different content after a transport failure.
         buffer_result = subprocess.run(
-            ["tmux", "show-buffer", "-b", args.pane_content_buffer],
+            ["tmux", "save-buffer", "-b", args.pane_content_buffer, "-"],
             capture_output=True,
             text=True,
             check=True,
