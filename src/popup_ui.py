@@ -117,6 +117,8 @@ class PopupUI:
         popup_cmd = [
             "tmux",
             "display-popup",
+            "-t",
+            self.pane_id,
             "-E",
             "-B",
             "-x",
@@ -177,7 +179,7 @@ class PopupUI:
             self.config.range_marker_bg_colour,
         ]
         if self.client_name:
-            popup_cmd[2:2] = ["-t", self.client_name]
+            popup_cmd[2:2] = ["-c", self.client_name]
 
         logger = DebugLogger.get_instance()
 

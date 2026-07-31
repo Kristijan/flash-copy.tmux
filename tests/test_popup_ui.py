@@ -45,7 +45,15 @@ class TestPopupUIAutoPaste:
             for call in mock_subprocess.call_args_list
             if "display-popup" in call.args[0]
         )
-        assert popup_command[:5] == ["tmux", "display-popup", "-t", "client-1", "-E"]
+        assert popup_command[:7] == [
+            "tmux",
+            "display-popup",
+            "-c",
+            "client-1",
+            "-t",
+            "%1",
+            "-E",
+        ]
 
     @patch("src.popup_ui.subprocess.run")
     @patch("src.popup_ui.TmuxPaneUtils.get_pane_dimensions")
