@@ -145,7 +145,6 @@ def main(pane_id: str, client_name: str):
             search_interface=search,
             clipboard=clipboard,
             pane_id=pane_id,
-            client_name=client_name,
             config=config,
         )
 

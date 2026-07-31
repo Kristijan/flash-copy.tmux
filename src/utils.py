@@ -161,8 +161,9 @@ class TmuxPaneUtils:
         Calculate the popup positioning parameters to seamlessly overlay a pane.
 
         Based on tmux popup coordinate behavior:
-        - x = pane_left
-        - y = pane_top
+        - For panes at the top (top=0): y = pane_top
+        - For other panes: y = pane_bottom + 1 (to account for the border above the pane)
+        - x always = pane_left
         - width and height match the pane dimensions
 
         Args:
@@ -171,9 +172,11 @@ class TmuxPaneUtils:
         Returns:
             Dictionary with keys 'x', 'y', 'width', 'height' for popup positioning
         """
+        y_position = dimensions.top if dimensions.top == 0 else dimensions.bottom + 1
+
         return {
             "x": dimensions.left,
-            "y": dimensions.top,
+            "y": y_position,
             "width": dimensions.width,
             "height": dimensions.height,
         }

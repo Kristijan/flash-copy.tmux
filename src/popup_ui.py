@@ -32,7 +32,6 @@ class PopupUI:
         clipboard: Clipboard,
         pane_id: str,
         config: FlashCopyConfig,
-        client_name: str | None = None,
     ):
         """
         Initialise the popup UI.
@@ -43,13 +42,11 @@ class PopupUI:
             clipboard: Clipboard instance for copying
             pane_id: The tmux pane ID
             config: FlashCopyConfig with all configuration options
-            client_name: The tmux client that launched the popup
         """
         self.pane_content = pane_content
         self.search_interface = search_interface
         self.clipboard = clipboard
         self.pane_id = pane_id
-        self.client_name = client_name
         self.config = config
         self.search_query = ""
         self.current_matches: list[SearchMatch] = []
@@ -89,16 +86,28 @@ class PopupUI:
         # Get pane dimensions for seamless overlay positioning
         pane_dimensions = TmuxPaneUtils.get_pane_dimensions(self.pane_id)
 
-        if pane_dimensions is None:
-            raise PopupExecutionError(f"Could not resolve popup geometry for pane {self.pane_id}")
-
-        # Geometry is fixed for the lifetime of this immutable snapshot. A resize
-        # applies to the next invocation rather than changing coordinates mid-search.
-        popup_pos = TmuxPaneUtils.calculate_popup_position(pane_dimensions)
-        popup_x = popup_pos["x"]
-        popup_y = popup_pos["y"]
-        popup_width = popup_pos["width"]
-        popup_height = popup_pos["height"]
+        if pane_dimensions:
+            popup_pos = TmuxPaneUtils.calculate_popup_position(pane_dimensions)
+            popup_x = popup_pos["x"]
+            popup_y = popup_pos["y"]
+            popup_width = popup_pos["width"]
+            popup_height = popup_pos["height"]
+        else:
+            try:
+                result = subprocess.run(
+                    ["tmux", "display-message", "-p", "#{window_width},#{window_height}"],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                popup_width, popup_height = map(int, result.stdout.strip().split(","))
+                popup_x = 0
+                popup_y = 0
+            except (subprocess.SubprocessError, ValueError):
+                popup_width = 160
+                popup_height = 40
+                popup_x = 0
+                popup_y = 0
 
         # Create a command that will be executed in the popup
         # We'll use a custom Python script for better control
@@ -117,8 +126,6 @@ class PopupUI:
         popup_cmd = [
             "tmux",
             "display-popup",
-            "-t",
-            self.pane_id,
             "-E",
             "-B",
             "-x",
@@ -178,9 +185,6 @@ class PopupUI:
             "--range-marker-bg-colour",
             self.config.range_marker_bg_colour,
         ]
-        if self.client_name:
-            popup_cmd[2:2] = ["-c", self.client_name]
-
         logger = DebugLogger.get_instance()
 
         try:

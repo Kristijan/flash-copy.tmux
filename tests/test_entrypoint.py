@@ -41,7 +41,6 @@ def test_entrypoint_propagates_copy_or_paste_failure(monkeypatch, capsys):
     assert exit_info.value.code == 1
     assert "Clipboard copy/paste operation failed" in capsys.readouterr().err
     module.PopupUI.assert_called_once()
-    assert module.PopupUI.call_args.kwargs["client_name"] == "client-1"
     clipboard.copy_and_paste.assert_called_once_with(
         "visible",
         pane_id="%1",

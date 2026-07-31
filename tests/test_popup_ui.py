@@ -19,46 +19,6 @@ class TestPopupUIAutoPaste:
     @patch("src.popup_ui.TmuxPaneUtils.get_pane_dimensions")
     @patch("src.popup_ui.TmuxPaneUtils.calculate_popup_position")
     @patch("src.popup_ui.DebugLogger.get_instance")
-    def test_popup_targets_launching_client(
-        self, mock_get_instance, mock_calc_pos, mock_get_dims, mock_subprocess
-    ):
-        mock_get_instance.return_value = MagicMock(enabled=False, log_file="")
-        mock_get_dims.return_value = MagicMock()
-        mock_calc_pos.return_value = {"x": 0, "y": 0, "width": 100, "height": 20}
-        mock_subprocess.return_value = MagicMock(returncode=0, stdout="")
-        search_interface = MagicMock(spec=SearchInterface)
-        search_interface.reverse_search = True
-        search_interface.word_separators = ""
-        popup_ui = PopupUI(
-            pane_content="text",
-            search_interface=search_interface,
-            clipboard=MagicMock(spec=Clipboard),
-            pane_id="%1",
-            config=FlashCopyConfig(),
-            client_name="client-1",
-        )
-
-        popup_ui.run()
-
-        popup_command = next(
-            call.args[0]
-            for call in mock_subprocess.call_args_list
-            if "display-popup" in call.args[0]
-        )
-        assert popup_command[:7] == [
-            "tmux",
-            "display-popup",
-            "-c",
-            "client-1",
-            "-t",
-            "%1",
-            "-E",
-        ]
-
-    @patch("src.popup_ui.subprocess.run")
-    @patch("src.popup_ui.TmuxPaneUtils.get_pane_dimensions")
-    @patch("src.popup_ui.TmuxPaneUtils.calculate_popup_position")
-    @patch("src.popup_ui.DebugLogger.get_instance")
     def test_hyphen_leading_custom_labels_are_passed_as_attached_option(
         self, mock_get_instance, mock_calc_pos, mock_get_dims, mock_subprocess
     ):
@@ -502,13 +462,14 @@ class TestPopupUIErrorHandling:
     @patch("src.popup_ui.subprocess.run")
     @patch("src.popup_ui.TmuxPaneUtils.get_pane_dimensions")
     @patch("src.popup_ui.DebugLogger.get_instance")
-    def test_popup_aborts_when_targeted_pane_geometry_is_unavailable(
+    def test_popup_dimensions_fallback_when_pane_geometry_is_unavailable(
         self, mock_get_instance, mock_get_dims, mock_subprocess
     ):
         mock_logger = MagicMock()
         mock_logger.log_file = ""
         mock_get_instance.return_value = mock_logger
         mock_get_dims.return_value = None
+        mock_subprocess.return_value = MagicMock(returncode=0, stdout="200,50")
         search_interface = MagicMock(spec=SearchInterface)
         search_interface.reverse_search = True
         search_interface.word_separators = ""
@@ -520,10 +481,9 @@ class TestPopupUIErrorHandling:
             config=FlashCopyConfig(),
         )
 
-        with pytest.raises(PopupExecutionError, match="geometry for pane test_pane"):
-            popup_ui._launch_popup()
+        popup_ui._launch_popup()
 
-        mock_subprocess.assert_not_called()
+        assert any("display-message" in call.args[0] for call in mock_subprocess.call_args_list)
 
     @patch("src.popup_ui.subprocess.run")
     @patch("src.popup_ui.TmuxPaneUtils.get_pane_dimensions")
