@@ -21,9 +21,9 @@ Current overview:
 | --------------------- | ----: | ---------------------------------------- |
 | Implemented           |     7 | F-01, F-04, F-05, F-13–F-16               |
 | Accepted decision     |     1 | F-02                                     |
-| Partially implemented |     1 | F-06                                     |
+| Partially implemented |     2 | F-06, F-09                               |
 | Won't fix             |     2 | F-03, F-19                               |
-| Not started           |    13 | F-07–F-12, F-17, F-18, F-20–F-24           |
+| Not started           |    12 | F-07, F-08, F-10–F-12, F-17, F-18, F-20–F-24 |
 
 There are **13 findings with open implementation scope**, all not started.
 
@@ -37,7 +37,7 @@ There are **13 findings with open implementation scope**, all not started.
 | F-06    | **Partially implemented** | `pvrovzutwpkwzsnxwmszutunxntopllp` — `fix: bind actions to their launching tmux context` | Popup targeting was removed because it changed established placement behaviour |
 | F-07    | **Not started**       | —                                                                                           | High-match search/render scaling work                                               |
 | F-08    | **Not started**       | —                                                                                           | Literal separator regex handling                                                    |
-| F-09    | **Not started**       | —                                                                                           | Unique representable label positions                                                |
+| F-09    | **Partially implemented** | `oszqkqmwpxzrllwumsskuqlvmvqzsmvq` — `fix: append end-of-line labels when space permits` | Overlapping occurrences can still compete for one representable position |
 | F-10    | **Not started**       | —                                                                                           | Unicode normalized-to-original offset mapping                                       |
 | F-11    | **Not started**       | —                                                                                           | Grapheme and terminal-cell-width model                                              |
 | F-12    | **Not started**       | —                                                                                           | Effective targeted `word-separators` lookup                                         |
@@ -56,7 +56,7 @@ There are **13 findings with open implementation scope**, all not started.
 
 Verification for the implemented stack after removing explicit tmux-version enforcement:
 
-- 306 tests pass on macOS/Python 3.14.6;
+- 307 tests pass on macOS/Python 3.14.6;
 - reported `src` coverage is 96%;
 - type checking, linting, formatting, and `git diff --check` pass;
 - the working copy is clean above the implementation and rollback changes.
@@ -315,7 +315,9 @@ separator position.
 
 #### F-09 — End-of-token occurrences can overwrite visible labels
 
-- Status: confirmed defect
+- Discovery status: confirmed defect
+- Implementation: **partially implemented** in `jj` change
+  `oszqkqmwpxzrllwumsskuqlvmvqzsmvq`
 - Severity: medium
 - Confidence: high
 
@@ -325,6 +327,10 @@ assigned but only the later one remains visible; the hidden label is still accep
 
 Direction: determine unique representable overlay positions before assigning labels, or omit
 colliding occurrences. Assert one visible label for every selectable label.
+
+Progress: an end-of-line label is now appended when the current pane row has a spare cell, while
+matches ending exactly at the pane boundary retain the fixed-width final-character replacement.
+The overlapping-occurrence collision remains open.
 
 #### F-10 — Unicode lowercase expansion corrupts original offsets
 

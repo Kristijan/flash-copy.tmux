@@ -368,16 +368,32 @@ class InteractiveUI:
             display_line = before_match + highlighted + after_matched
             cache_line_id += 1
 
-            # Labels never add width. At end-of-line, replace the matched final
-            # character while keeping the logical endpoint after that character.
             plain_replace_index = plain_match_end
+            pane_width = self.dimensions.get("width")
+            can_append_at_line_end = (
+                plain_replace_index >= len(line_plain)
+                and isinstance(pane_width, int)
+                and pane_width > 0
+                and len(line_plain) % pane_width != 0
+            )
+            coloured_label = f"{self.config.label_colour}{match.label}{AnsiStyles.RESET}"
+            if can_append_at_line_end:
+                coloured_insert_pos = get_coloured_pos(display_line, len(line_plain))
+                display_line = (
+                    display_line[:coloured_insert_pos]
+                    + coloured_label
+                    + display_line[coloured_insert_pos:]
+                )
+                cache_line_id += 1
+                continue
+
+            # Replace one character so a label at the pane boundary cannot wrap.
             if plain_replace_index >= len(line_plain):
                 plain_replace_index = len(line_plain) - 1
             coloured_replace_start = get_coloured_pos(display_line, plain_replace_index)
             coloured_skip_len = get_coloured_pos(
                 display_line[coloured_replace_start:], 1, use_cache=False
             )
-            coloured_label = f"{self.config.label_colour}{match.label}{AnsiStyles.RESET}"
             display_line = (
                 display_line[:coloured_replace_start]
                 + coloured_label
