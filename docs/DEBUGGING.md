@@ -115,14 +115,11 @@ The timeout serves as a safety mechanism to:
 2. **Free resources**: Closes the popup if you walk away from your computer
 3. **Handle edge cases**: Catches rare bugs that might cause the UI to hang
 
-### Timeout Coordination
+### Timeout Ownership
 
-The implementation uses two coordinated timeouts:
+The interactive child exclusively owns idle expiry. Its configurable timer defaults to 15 seconds, resets after every keypress, and exits the popup when the user has actually been idle for that duration. The parent waits for `display-popup` without a fixed deadline; otherwise a user who remains active could be interrupted despite continuously resetting the child's timer.
 
-- **Child process (interactive UI)**: Configurable self-timeout (default: 15 seconds) with configurable warning (default: 5 seconds before timeout, appearing at 10 seconds elapsed)
-- **Parent process**: Child timeout + 5 seconds safety margin to catch unexpected hangs
-
-The child process always exits gracefully at the configured timeout. The parent's timeout is a backup that should never be reached under normal circumstances.
+The warning defaults to 5 seconds before expiry, appearing after 10 idle seconds with the default settings.
 
 **Note**: The warning value is relative to the timeout, not an absolute time. If `@flash-copy-idle-warning` is equal to or greater than `@flash-copy-idle-timeout`, no warning is displayed.
 
@@ -309,7 +306,7 @@ Look for pane dimensions and positions.
 
 **Solution**:
 
-1. Check tmux version: `tmux -V` (should be 3.2+)
+1. Check tmux version: `tmux -V` (should be 3.6b+)
 2. Verify pane dimensions match your expectations
 
 ### Issue: Labels not appearing

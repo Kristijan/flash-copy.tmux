@@ -2,6 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Maintaining agent instructions
+
+Keep `CLAUDE.md` and `AGENTS.md` updated in tandem. When changing shared project guidance
+in either file, propagate the same change to the other file. Preserve audience-specific
+wording only where the instructions genuinely differ between Claude Code and other coding
+agents.
+
 ## Project Overview
 
 tmux-flash-copy is a tmux plugin inspired by flash.nvim that enables searching visible words in the current tmux pane and copying them to the clipboard using keyboard label shortcuts. The project is written in Python 3.10+ and integrates with tmux's OSC52 clipboard support.
@@ -90,7 +97,8 @@ uv run pytest --cov=src --cov-report=term-missing
 - Word boundaries use tmux's `word-separators` option by default, overrideable via `@flash-copy-word-separators`
 - Labels are assigned to matches in order determined by `@flash-copy-reverse-search` (bottom-to-top or top-to-bottom)
 - Search is dynamic - updates as user types, with real-time label reassignment
-- Clipboard operations use OSC52 (tmux 3.2+) as primary method, falling back to system tools
+- The plugin requires tmux 3.6b+; clipboard operations use OSC52 as the primary method,
+  falling back to system tools
 
 ### tmux Integration
 
@@ -143,3 +151,19 @@ Project uses ruff with:
 - Python 3.10+ target
 - Import sorting via isort
 - Multiple linting rules enabled (see pyproject.toml)
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked as local Markdown under `.scratch/<feature>/`. See
+`docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Triage state uses the five default canonical role strings. See
+`docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Domain documentation uses a single-context layout. See `docs/agents/domain.md`.

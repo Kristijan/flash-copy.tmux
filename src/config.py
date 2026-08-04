@@ -9,6 +9,13 @@ import ast
 import subprocess
 from dataclasses import dataclass, field
 
+DEFAULT_IDLE_TIMEOUT = 15
+
+
+def _is_single_cell_label(character: str) -> bool:
+    """Return whether a label is one environment-independent visible cell."""
+    return len(character) == 1 and "!" <= character <= "~"
+
 
 @dataclass
 class FlashCopyConfig:
@@ -26,29 +33,57 @@ class FlashCopyConfig:
     debug_enabled: bool = False
     auto_paste_enable: bool = True
     label_characters: str | None = None
-    idle_timeout: int = 15
+    idle_timeout: int = DEFAULT_IDLE_TIMEOUT
     idle_warning: int = 5
+    copy_mode: str = "word"
     range_selection_enable: bool = True
-    range_selection_key: str = ","
+    mode_switch_key: str = ","
     range_copy_mode: str = "word"
     range_marker_fg_colour: str = "\033[30m"
     range_marker_bg_colour: str = "\033[45m"
-    range_selection_key_fell_back: bool = field(init=False, default=False, repr=False)
+    mode_switch_key_fell_back: bool = field(init=False, default=False, repr=False)
+    label_characters_fell_back: bool = field(init=False, default=False, repr=False)
 
     def __post_init__(self):
         """Validate configuration that depends on multiple option values."""
+        if self.idle_timeout < 1:
+            self.idle_timeout = DEFAULT_IDLE_TIMEOUT
+        if self.idle_warning < 0:
+            self.idle_warning = 0
+
+        self.copy_mode = self.copy_mode.lower()
+        if self.copy_mode not in ("word", "range") or not self.range_selection_enable:
+            self.copy_mode = "word"
+
         self.range_copy_mode = self.range_copy_mode.lower()
         if self.range_copy_mode not in ("word", "precise"):
             self.range_copy_mode = "word"
 
-        key_is_valid = len(self.range_selection_key) == 1 and self.range_selection_key.isprintable()
-        conflicts_with_auto_paste = self.auto_paste_enable and self.range_selection_key in (
+        key_is_valid = len(self.mode_switch_key) == 1 and self.mode_switch_key.isprintable()
+        conflicts_with_auto_paste = self.auto_paste_enable and self.mode_switch_key in (
             ";",
             ":",
         )
         if not key_is_valid or conflicts_with_auto_paste:
-            self.range_selection_key = ","
-            self.range_selection_key_fell_back = True
+            self.mode_switch_key = ","
+            self.mode_switch_key_fell_back = True
+
+        if self.label_characters is not None:
+            reserved_keys = set()
+            if self.auto_paste_enable:
+                reserved_keys.update((";", ":"))
+            if self.range_selection_enable:
+                reserved_keys.add(self.mode_switch_key)
+
+            labels_are_valid = (
+                bool(self.label_characters)
+                and len(set(self.label_characters)) == len(self.label_characters)
+                and all(_is_single_cell_label(label) for label in self.label_characters)
+                and reserved_keys.isdisjoint(self.label_characters)
+            )
+            if not labels_are_valid:
+                self.label_characters = None
+                self.label_characters_fell_back = True
 
 
 class ConfigLoader:
@@ -257,7 +292,12 @@ class ConfigLoader:
         value = ConfigLoader._read_tmux_option(option_name, "")
         if not value:
             return default
-        return ConfigLoader.parse_bool(value)
+        normalized = value.lower()
+        if normalized in ("on", "true", "1", "yes"):
+            return True
+        if normalized in ("off", "false", "0", "no"):
+            return False
+        return default
 
     @staticmethod
     def get_string(option_name: str, default: str = "") -> str:
@@ -325,6 +365,17 @@ class ConfigLoader:
         """
         value = ConfigLoader.get_string(option_name, default="")
         return value if value else None
+
+    @staticmethod
+    def get_mode_switch_key(default: str = ",") -> str:
+        """Get the mode-switch key, preferring the current option name."""
+        missing = "\0"
+        key = ConfigLoader.get_string("@flash-copy-mode-switch-key", default=missing)
+        if key != missing:
+            return key
+
+        # Kept for compatibility with configurations created for version 1.4.0.
+        return ConfigLoader.get_string("@flash-copy-range-selection-key", default=default)
 
     @staticmethod
     def get_word_separators(default: str | None = None) -> str | None:
@@ -440,12 +491,15 @@ class ConfigLoader:
             label_characters=ConfigLoader.get_optional_string("@flash-copy-label-characters"),
             idle_timeout=ConfigLoader.get_int("@flash-copy-idle-timeout", default=15),
             idle_warning=ConfigLoader.get_int("@flash-copy-idle-warning", default=5),
+            copy_mode=ConfigLoader.get_choice(
+                "@flash-copy-mode",
+                choices=["word", "range"],
+                default="word",
+            ),
             range_selection_enable=ConfigLoader.get_bool(
                 "@flash-copy-range-selection", default=True
             ),
-            range_selection_key=ConfigLoader.get_string(
-                "@flash-copy-range-selection-key", default=","
-            ),
+            mode_switch_key=ConfigLoader.get_mode_switch_key(),
             range_copy_mode=ConfigLoader.get_choice(
                 "@flash-copy-range-copy-mode",
                 choices=["word", "precise"],

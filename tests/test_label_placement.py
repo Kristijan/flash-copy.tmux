@@ -77,10 +77,22 @@ def test_whole_word_match_replaces_following_space():
     assert visible == expected
 
 
-def test_end_of_line_match_replaces_final_character_without_adding_width():
+def test_end_of_line_match_appends_label_when_pane_has_spare_width():
     interactive_cls = load_interactive_ui()
     pane_content = "hello\n"
-    ui = interactive_cls("pane", pane_content, {}, FlashCopyConfig())
+    ui = interactive_cls("pane", pane_content, {"width": 6}, FlashCopyConfig())
+
+    match = ui.search_interface.search("hello")[0]
+    rendered = ui._display_line_with_matches("hello", 0, "hello")
+    visible = AnsiUtils.strip_ansi_codes(rendered)
+
+    assert visible == "hello" + match.label
+
+
+def test_end_of_line_match_replaces_final_character_at_pane_boundary():
+    interactive_cls = load_interactive_ui()
+    pane_content = "hello\n"
+    ui = interactive_cls("pane", pane_content, {"width": 5}, FlashCopyConfig())
 
     match = ui.search_interface.search("hello")[0]
     rendered = ui._display_line_with_matches("hello", 0, "hello")

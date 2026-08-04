@@ -58,7 +58,7 @@ A tmux plugin inspired by [flash.nvim](https://github.com/folke/flash.nvim) that
 
 ## Requirements
 
-- [tmux](https://github.com/tmux/tmux) 3.2+ (tested with tmux 3.7b)
+- [tmux](https://github.com/tmux/tmux) 3.6b+ (tested with tmux 3.7b)
 - [Python](https://www.python.org) 3.10+ (tested with Python 3.14.6)
 
 ## Installation
@@ -122,8 +122,8 @@ A tmux plugin inspired by [flash.nvim](https://github.com/folke/flash.nvim) that
 1. Press the bind key (default: `<tmux_prefix> F`, or `<tmux_prefix> Shift+f`) to activate the search.
 2. Type to search for words in the pane. The search is dynamic and updates as you type.
 3. Matching words will be highlighted in yellow with single-character labels in green.
-4. Press the label key corresponding to the word you want to copy.
-5. The selected text is immediately copied to your clipboard, and you are returned to your pane.
+4. Press a label key. In the default word mode, its word is copied immediately. In range mode, it pins the first endpoint so you can search for and select the second.
+5. The completed word or range is copied to your clipboard, and you are returned to your pane.
 
 ### Keybindings when search is active
 
@@ -133,7 +133,7 @@ A tmux plugin inspired by [flash.nvim](https://github.com/folke/flash.nvim) that
 | `Ctrl+W`         | Clear the previous word                                                     |
 | `Enter`          | Select the first match (determined by `@flash-copy-reverse-search` setting) |
 | `;`+`<label>`    | Copy and auto-paste the word or completed range (if auto-paste enabled)     |
-| `,`+`<label>`    | Pin the first endpoint and begin a fresh search for the second endpoint     |
+| `,`+`<label>`    | Use the copy mode opposite to `@flash-copy-mode` for this selection         |
 | `Ctrl+C` / `ESC` | Cancel and close the popup without copying                                  |
 
 ### Auto-paste text
@@ -150,16 +150,18 @@ The selected text is copied to the clipboard and automatically pasted into your 
 Range selection copies both separator-defined endpoint words and everything between them:
 
 1. Search for the first endpoint.
-2. Press `,` (comma), then its label. You can also press `,` followed by `Enter` to use the first match.
+2. Press `,` (comma) to switch from the default word mode to range mode, then select its label. You can also press `,` followed by `Enter` to use the first match.
 3. The first endpoint remains pinned with black text on a solid magenta block and the query clears.
 4. Search for an endpoint anywhere above or below the first one.
 5. Select its label, or press `Enter`, to copy all text between the two endpoints.
 
+Set `@flash-copy-mode` to `range` to start every invocation in range mode. The first label or `Enter` then pins the first endpoint without requiring comma. In this mode, comma switches the selection back to a one-off word copy.
+
 For example, endpoints shown as `he<M1>lo w<M2>rld` copy `hello world`. The entire word `hello` is highlighted while the second endpoint is pending. Separators outside the endpoint words are excluded, while separators and newlines between those words are preserved.
 
-Set `@flash-copy-range-copy-mode` to `precise` to use the exact marker boundaries instead. In the same example, precise mode copies `ello w` and highlights the initial `e`. Press `;` before the second label or `Enter` to copy and auto-paste the completed range.
+Set `@flash-copy-range-copy-mode` to `precise` to include the complete search query at each endpoint instead of expanding to whole words. In the same example, precise mode copies `hello w` and highlights the complete first query, `he`, while the second endpoint is pending. Press `;` before the second label or `Enter` to copy and auto-paste the completed range.
 
-Comma is searchable during the second search. To search for comma normally during the first search, disable range selection or configure a different range key.
+The mode-switch key is searchable during the second search. To search for it during the first search, disable range selection or configure a different key.
 
 ## Configuration
 

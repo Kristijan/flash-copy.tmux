@@ -27,6 +27,7 @@ from src.clipboard import Clipboard  # noqa: E402
 from src.config import ConfigLoader, FlashCopyConfig  # noqa: E402
 from src.debug_logger import DebugLogger  # noqa: E402
 from src.pane_capture import PaneCapture  # noqa: E402
+from src.popup_protocol import PopupExitCode  # noqa: E402
 from src.range_selection import ActiveRange  # noqa: E402
 from src.search_interface import SearchInterface, SearchMatch  # noqa: E402
 
@@ -45,6 +46,7 @@ class InteractiveUI:
         pane_content: str,
         dimensions: dict,
         config: FlashCopyConfig,
+        result_buffer: str | None = None,
     ):
         """
         Initialise the interactive UI.
@@ -54,6 +56,7 @@ class InteractiveUI:
             pane_content: The captured pane content
             dimensions: Pane dimensions dict
             config: FlashCopyConfig with all configuration options
+            result_buffer: Invocation-specific tmux buffer for the result
         """
         self.pane_id = pane_id
         self.pane_content = pane_content
@@ -61,6 +64,7 @@ class InteractiveUI:
         self.pane_content_plain = AnsiUtils.strip_ansi_codes(pane_content)
         self.dimensions = dimensions
         self.config = config
+        self.result_buffer = result_buffer
         # Use plain text for searching
         self.search_interface = SearchInterface(
             self.pane_content_plain,
@@ -73,7 +77,7 @@ class InteractiveUI:
         self.search_query = ""
         self.current_matches = []
         self.autopaste_modifier_active = False
-        self.range_modifier_active = False
+        self.mode_switch_active = False
         self.active_range: ActiveRange | None = None
         self.last_logged_modifier = None  # Track last logged modifier state to avoid repetition
         # Timeout tracking
@@ -85,8 +89,10 @@ class InteractiveUI:
             if hasattr(config, "debug_enabled") and config.debug_enabled
             else None
         )
-        if self.debug_logger and self.debug_logger.enabled and config.range_selection_key_fell_back:
-            self.debug_logger.log("Invalid range selection key; falling back to ','")
+        if self.debug_logger and self.debug_logger.enabled and config.mode_switch_key_fell_back:
+            self.debug_logger.log("Invalid mode switch key; falling back to ','")
+        if self.debug_logger and self.debug_logger.enabled and config.label_characters_fell_back:
+            self.debug_logger.log("Invalid label characters; falling back to default labels")
 
     def _update_search(self, new_query: str):
         """
@@ -103,7 +109,7 @@ class InteractiveUI:
         self.search_query = new_query
         reserved_labels = set()
         if self.config.range_selection_enable:
-            reserved_labels.add(self.config.range_selection_key)
+            reserved_labels.add(self.config.mode_switch_key)
 
         excluded_offsets = None
         if self.active_range:
@@ -362,16 +368,32 @@ class InteractiveUI:
             display_line = before_match + highlighted + after_matched
             cache_line_id += 1
 
-            # Labels never add width. At end-of-line, replace the matched final
-            # character while keeping the logical endpoint after that character.
             plain_replace_index = plain_match_end
+            pane_width = self.dimensions.get("width")
+            can_append_at_line_end = (
+                plain_replace_index >= len(line_plain)
+                and isinstance(pane_width, int)
+                and pane_width > 0
+                and len(line_plain) % pane_width != 0
+            )
+            coloured_label = f"{self.config.label_colour}{match.label}{AnsiStyles.RESET}"
+            if can_append_at_line_end:
+                coloured_insert_pos = get_coloured_pos(display_line, len(line_plain))
+                display_line = (
+                    display_line[:coloured_insert_pos]
+                    + coloured_label
+                    + display_line[coloured_insert_pos:]
+                )
+                cache_line_id += 1
+                continue
+
+            # Replace one character so a label at the pane boundary cannot wrap.
             if plain_replace_index >= len(line_plain):
                 plain_replace_index = len(line_plain) - 1
             coloured_replace_start = get_coloured_pos(display_line, plain_replace_index)
             coloured_skip_len = get_coloured_pos(
                 display_line[coloured_replace_start:], 1, use_cache=False
             )
-            coloured_label = f"{self.config.label_colour}{match.label}{AnsiStyles.RESET}"
             display_line = (
                 display_line[:coloured_replace_start]
                 + coloured_label
@@ -391,8 +413,8 @@ class InteractiveUI:
             marker_start = max(0, endpoint.copy_start_col)
             marker_end = min(len(line_plain), endpoint.copy_end_col)
         else:
-            marker_start = max(0, endpoint.col - 1)
-            marker_end = min(len(line_plain), marker_start + 1)
+            marker_start = max(0, endpoint.match_start_col)
+            marker_end = min(len(line_plain), endpoint.match_end_col)
 
         original_marker_end = AnsiUtils.map_position_to_coloured(display_line, marker_end)
         restored_style = AnsiUtils.get_active_style_at(display_line, original_marker_end)
@@ -629,11 +651,11 @@ class InteractiveUI:
                 elif (
                     self.config.range_selection_enable
                     and self.active_range is None
-                    and char == self.config.range_selection_key
+                    and char == self.config.mode_switch_key
                 ):
-                    self.range_modifier_active = True
+                    self.mode_switch_active = True
                     if self.debug_logger and self.debug_logger.enabled:
-                        self.debug_logger.log("Range selection modifier activated")
+                        self.debug_logger.log("Copy mode switch activated")
                     continue
                 elif char in (";", ":"):
                     # Semicolon/colon handling depends on auto-paste enabled setting
@@ -708,7 +730,7 @@ class InteractiveUI:
     def _reset_modifiers(self):
         """Clear sticky modifier state after an editing command."""
         self.autopaste_modifier_active = False
-        self.range_modifier_active = False
+        self.mode_switch_active = False
         self.last_logged_modifier = None
 
     def _select_match(self, match: SearchMatch) -> str | None:
@@ -727,7 +749,8 @@ class InteractiveUI:
             self._save_result(text, should_paste=self.autopaste_modifier_active)
             return text
 
-        if self.range_modifier_active:
+        use_range_mode = (self.config.copy_mode == "range") != self.mode_switch_active
+        if use_range_mode:
             self._begin_range(match)
             return None
 
@@ -741,7 +764,7 @@ class InteractiveUI:
     def _begin_range(self, match: SearchMatch):
         """Pin the first endpoint and begin a fresh search for the second."""
         self.active_range = ActiveRange.from_match(match, fallback_label="+")
-        self.range_modifier_active = False
+        self.mode_switch_active = False
         self.autopaste_modifier_active = False
         self.last_logged_modifier = None
         if self.debug_logger and self.debug_logger.enabled:
@@ -759,16 +782,19 @@ class InteractiveUI:
         """
         logger = DebugLogger.get_instance()
 
-        # Store result in a tmux buffer for parent to read
-        # Use pane-specific buffer name to avoid conflicts with concurrent instances
-        result_buffer = f"__tmux_flash_copy_result_{self.pane_id}__"
+        if self.result_buffer is None:
+            raise RuntimeError("Result buffer was not provided by the popup parent")
+
+        if not text:
+            sys.exit(PopupExitCode.CANCEL)
+
         try:
             if logger.enabled:
                 logger.log(f"Writing result to tmux buffer (length: {len(text)})")
                 logger.log(f"Auto-paste: {should_paste}")
 
             result = subprocess.run(
-                ["tmux", "set-buffer", "-b", result_buffer, text],
+                ["tmux", "set-buffer", "-b", self.result_buffer, text],
                 check=True,
                 capture_output=True,
             )
@@ -782,7 +808,7 @@ class InteractiveUI:
             sys.exit(1)
 
         # Use exit code to communicate paste flag: 10 for paste, 0 for copy
-        exit_code = 10 if should_paste else 0
+        exit_code = PopupExitCode.PASTE if should_paste else PopupExitCode.COPY
         if logger.enabled:
             logger.log(f"Exiting with code {exit_code}")
         sys.exit(exit_code)
@@ -792,6 +818,16 @@ def main():
     """Main entry point for the interactive UI."""
     parser = argparse.ArgumentParser(description="Interactive search UI for tmux-flash-copy")
     parser.add_argument("--pane-id", required=True, help="The tmux pane ID")
+    parser.add_argument(
+        "--pane-content-buffer",
+        required=True,
+        help="Invocation-specific tmux buffer containing the captured pane",
+    )
+    parser.add_argument(
+        "--result-buffer",
+        required=True,
+        help="Invocation-specific tmux buffer for returning the selection",
+    )
     parser.add_argument(
         "--reverse-search", default="True", help="Enable reverse search (bottom to top)"
     )
@@ -830,7 +866,13 @@ def main():
         help="Seconds before timeout to show warning",
     )
     parser.add_argument("--range-selection", default="true", help="Enable range selection")
-    parser.add_argument("--range-selection-key", default=",", help="Range selection modifier")
+    parser.add_argument(
+        "--copy-mode",
+        choices=["word", "range"],
+        default="word",
+        help="Default copy mode",
+    )
+    parser.add_argument("--mode-switch-key", default=",", help="Copy mode switch modifier")
     parser.add_argument(
         "--range-copy-mode",
         choices=["word", "precise"],
@@ -851,27 +893,18 @@ def main():
     args = parser.parse_args()
 
     try:
-        # Try to read pane content from buffer first (optimization to avoid redundant capture)
-        # Use pane-specific buffer name to avoid conflicts with concurrent instances
-        pane_content = None
-        pane_content_buffer = f"__tmux_flash_copy_pane_content_{args.pane_id}__"
-        try:
-            buffer_result = subprocess.run(
-                ["tmux", "show-buffer", "-b", pane_content_buffer],
-                capture_output=True,
-                text=True,
-                check=True,
-                timeout=5,
-            )
-            if buffer_result.returncode == 0 and buffer_result.stdout:
-                pane_content = buffer_result.stdout
-        except (subprocess.SubprocessError, OSError):
-            pass
+        # Use only the immutable snapshot prepared by the parent. Recapturing here
+        # would silently search different content after a transport failure.
+        buffer_result = subprocess.run(
+            ["tmux", "save-buffer", "-b", args.pane_content_buffer, "-"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=5,
+        )
+        pane_content = buffer_result.stdout
 
-        # Fall back to capturing if buffer read failed
         capture = PaneCapture(args.pane_id)
-        if pane_content is None:
-            pane_content = capture.capture_pane()
 
         # Get pane dimensions
         dimensions = capture.get_pane_dimensions()
@@ -892,8 +925,9 @@ def main():
             label_characters=args.label_characters if args.label_characters else None,
             idle_timeout=int(args.idle_timeout),
             idle_warning=int(args.idle_warning),
+            copy_mode=args.copy_mode,
             range_selection_enable=ConfigLoader.parse_bool(args.range_selection),
-            range_selection_key=args.range_selection_key,
+            mode_switch_key=args.mode_switch_key,
             range_copy_mode=args.range_copy_mode,
             range_marker_fg_colour=args.range_marker_fg_colour,
             range_marker_bg_colour=args.range_marker_bg_colour,
@@ -906,7 +940,13 @@ def main():
             logger.log(f"Pane dimensions: {dimensions}")
 
         # Run interactive UI
-        ui = InteractiveUI(args.pane_id, pane_content, dimensions, config)
+        ui = InteractiveUI(
+            args.pane_id,
+            pane_content,
+            dimensions,
+            config,
+            result_buffer=args.result_buffer,
+        )
         ui.run()
 
         # Exit explicitly to close the popup
@@ -917,6 +957,7 @@ def main():
 
         error_msg = f"Error: {e}\n{traceback.format_exc()}"
         print(error_msg, file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

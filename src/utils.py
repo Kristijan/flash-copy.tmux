@@ -172,8 +172,6 @@ class TmuxPaneUtils:
         Returns:
             Dictionary with keys 'x', 'y', 'width', 'height' for popup positioning
         """
-        # Determine y position based on whether pane is at the top
-        # For non-top panes, add 1 to account for the border above the pane
         y_position = dimensions.top if dimensions.top == 0 else dimensions.bottom + 1
 
         return {

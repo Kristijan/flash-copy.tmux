@@ -22,12 +22,13 @@ class TestFlashCopyConfig:
         assert config.prompt_colour == "\033[1m"
         assert config.debug_enabled is False
         assert config.auto_paste_enable is True
+        assert config.copy_mode == "word"
         assert config.range_selection_enable is True
-        assert config.range_selection_key == ","
+        assert config.mode_switch_key == ","
         assert config.range_copy_mode == "word"
         assert config.range_marker_fg_colour == "\033[30m"
         assert config.range_marker_bg_colour == "\033[45m"
-        assert config.range_selection_key_fell_back is False
+        assert config.mode_switch_key_fell_back is False
 
     def test_custom_values(self):
         """Test configuration with custom values."""
@@ -56,28 +57,67 @@ class TestFlashCopyConfig:
         assert config.debug_enabled is True
         assert config.auto_paste_enable is False
 
-    def test_invalid_range_selection_key_falls_back_to_comma(self):
-        config = FlashCopyConfig(range_selection_key="too long")
+    def test_copy_mode_is_normalised_and_invalid_values_fall_back_to_word(self):
+        assert FlashCopyConfig(copy_mode="RANGE").copy_mode == "range"
+        assert FlashCopyConfig(copy_mode="invalid").copy_mode == "word"
 
-        assert config.range_selection_key == ","
-        assert config.range_selection_key_fell_back is True
+    def test_range_mode_falls_back_to_word_when_range_selection_is_disabled(self):
+        config = FlashCopyConfig(copy_mode="range", range_selection_enable=False)
 
-    def test_range_selection_key_conflicting_with_auto_paste_falls_back(self):
-        config = FlashCopyConfig(range_selection_key=";")
+        assert config.copy_mode == "word"
 
-        assert config.range_selection_key == ","
-        assert config.range_selection_key_fell_back is True
+    def test_invalid_mode_switch_key_falls_back_to_comma(self):
+        config = FlashCopyConfig(mode_switch_key="too long")
 
-    def test_semicolon_range_key_is_valid_when_auto_paste_is_disabled(self):
-        config = FlashCopyConfig(auto_paste_enable=False, range_selection_key=";")
+        assert config.mode_switch_key == ","
+        assert config.mode_switch_key_fell_back is True
 
-        assert config.range_selection_key == ";"
-        assert config.range_selection_key_fell_back is False
+    def test_mode_switch_key_conflicting_with_auto_paste_falls_back(self):
+        config = FlashCopyConfig(mode_switch_key=";")
+
+        assert config.mode_switch_key == ","
+        assert config.mode_switch_key_fell_back is True
+
+    def test_semicolon_mode_switch_key_is_valid_when_auto_paste_is_disabled(self):
+        config = FlashCopyConfig(auto_paste_enable=False, mode_switch_key=";")
+
+        assert config.mode_switch_key == ";"
+        assert config.mode_switch_key_fell_back is False
 
     def test_invalid_range_copy_mode_falls_back_to_word(self):
         config = FlashCopyConfig(range_copy_mode="invalid")
 
         assert config.range_copy_mode == "word"
+
+    def test_invalid_custom_labels_fall_back_to_defaults(self):
+        invalid_sets = [
+            "aa",  # duplicate
+            "a;",  # active auto-paste key
+            "a,",  # active mode-switch key
+            "a界",  # two-cell character
+            "a\u0301",  # zero-cell combining character
+            "a\n",  # structural control
+            "a ",  # invisible label
+            "a¡",  # terminal-dependent East Asian Ambiguous width
+        ]
+
+        for label_characters in invalid_sets:
+            config = FlashCopyConfig(label_characters=label_characters)
+            assert config.label_characters is None
+            assert config.label_characters_fell_back is True
+
+    def test_valid_visible_ascii_custom_labels_are_preserved(self):
+        config = FlashCopyConfig(label_characters="asdf")
+
+        assert config.label_characters == "asdf"
+        assert config.label_characters_fell_back is False
+
+    def test_non_positive_idle_timeout_falls_back_to_default(self):
+        assert FlashCopyConfig(idle_timeout=0).idle_timeout == 15
+        assert FlashCopyConfig(idle_timeout=-1).idle_timeout == 15
+
+    def test_negative_idle_warning_is_clamped_to_zero(self):
+        assert FlashCopyConfig(idle_warning=-1).idle_warning == 0
 
 
 class TestConfigLoader:
@@ -109,6 +149,31 @@ class TestConfigLoader:
         result = ConfigLoader._read_all_global_options()
 
         assert result["@flash-copy-range-selection-key"] == "\\"
+
+    def test_mode_switch_key_prefers_new_option_over_legacy_alias(self):
+        options = {
+            "@flash-copy-mode-switch-key": "\\",
+            "@flash-copy-range-selection-key": ",",
+        }
+        with patch.object(ConfigLoader, "_global_options_cache", options):
+            assert ConfigLoader.get_mode_switch_key() == "\\"
+
+    def test_mode_switch_key_uses_legacy_alias_when_new_option_is_absent(self):
+        options = {"@flash-copy-range-selection-key": "\\"}
+        with patch.object(ConfigLoader, "_global_options_cache", options):
+            assert ConfigLoader.get_mode_switch_key() == "\\"
+
+    def test_empty_new_mode_switch_key_still_takes_precedence(self):
+        options = {
+            "@flash-copy-mode-switch-key": "",
+            "@flash-copy-range-selection-key": "\\",
+        }
+        with patch.object(ConfigLoader, "_global_options_cache", options):
+            key = ConfigLoader.get_mode_switch_key()
+
+        config = FlashCopyConfig(mode_switch_key=key)
+        assert config.mode_switch_key == ","
+        assert config.mode_switch_key_fell_back is True
 
     @patch("subprocess.run")
     def test_read_all_global_options_failure(self, mock_run):
@@ -339,6 +404,13 @@ class TestConfigLoader:
         assert result is True
 
     @patch("src.config.ConfigLoader._read_tmux_option")
+    def test_get_bool_invalid_value_uses_declared_default(self, mock_read):
+        mock_read.return_value = "sometimes"
+
+        assert ConfigLoader.get_bool("@test-option", default=True) is True
+        assert ConfigLoader.get_bool("@test-option", default=False) is False
+
+    @patch("src.config.ConfigLoader._read_tmux_option")
     def test_get_string_with_value(self, mock_read):
         """Test getting string option with value."""
         mock_read.return_value = "test_value"
@@ -515,14 +587,11 @@ class TestConfigLoader:
     def test_get_word_separators_invalid_escape_sequence(self, mock_read_option, mock_read_window):
         """Test handling of invalid escape sequences in word-separators."""
         mock_read_option.return_value = ""
-        # Invalid escape sequence that causes ast.literal_eval to fail
-        mock_read_window.return_value = 'word-separators "\\x999"'
+        mock_read_window.return_value = r'word-separators "\xZZ"'
 
         result = ConfigLoader.get_word_separators()
 
-        # Should fall back to extracting between quotes without decoding
-        # The string is extracted as-is: \x999
-        assert result == "\x999"
+        assert result == r"\xZZ"
 
     @patch("src.config.ConfigLoader._read_tmux_window_option")
     @patch("src.config.ConfigLoader._read_tmux_option")
@@ -614,7 +683,7 @@ class TestConfigLoader:
         """Test loading all flash-copy configuration."""
         mock_global_opts.return_value = {}
         mock_window_opts.return_value = {}
-        mock_choice.side_effect = ["bottom", "word"]
+        mock_choice.side_effect = ["bottom", "word", "word"]
         mock_bool.side_effect = [True, False, False, True, True]
         mock_word_sep.return_value = None
         mock_string.side_effect = [
@@ -646,8 +715,9 @@ class TestConfigLoader:
         assert config.auto_paste_enable is True
         assert config.idle_timeout == 15
         assert config.idle_warning == 5
+        assert config.copy_mode == "word"
         assert config.range_selection_enable is True
-        assert config.range_selection_key == ","
+        assert config.mode_switch_key == ","
         assert config.range_copy_mode == "word"
         assert config.range_marker_fg_colour == "\033[31m"
         assert config.range_marker_bg_colour == "\033[46m"
@@ -672,7 +742,7 @@ class TestConfigLoader:
         """Test loading flash-copy configuration with auto-paste disabled."""
         mock_global_opts.return_value = {}
         mock_window_opts.return_value = {}
-        mock_choice.side_effect = ["top", "precise"]
+        mock_choice.side_effect = ["top", "range", "precise"]
         mock_bool.side_effect = [True, True, True, False, True]
         mock_word_sep.return_value = " -"
         mock_string.side_effect = [
@@ -693,4 +763,5 @@ class TestConfigLoader:
         assert config.auto_paste_enable is False
         assert config.idle_timeout == 30
         assert config.idle_warning == 10
+        assert config.copy_mode == "range"
         assert config.range_copy_mode == "precise"

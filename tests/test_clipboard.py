@@ -1,7 +1,7 @@
 """Tests for clipboard module."""
 
 import sys
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 from src.clipboard import Clipboard
 
@@ -22,7 +22,17 @@ class TestClipboard:
         result = Clipboard.copy("test text")
 
         assert result is True
-        mock_osc52.assert_called_once_with("test text")
+        mock_osc52.assert_called_once_with("test text", None)
+
+    @patch("src.clipboard.SubprocessUtils.run_command_quiet")
+    def test_tmux_osc52_targets_launching_client(self, mock_run):
+        mock_run.return_value = True
+
+        assert Clipboard._tmux_osc52("test text", "client-1") is True
+
+        mock_run.assert_called_once_with(
+            ["tmux", "set-buffer", "-w", "-t", "client-1", "--", "test text"]
+        )
 
     @patch("src.clipboard.Clipboard._tmux_osc52")
     @patch("src.clipboard.Clipboard._pbcopy")
@@ -166,18 +176,37 @@ class TestClipboard:
 
         assert result is True
         mock_copy.assert_called_once()
-        # Should be called twice: once for set-buffer, once for paste-buffer
-        assert mock_run.call_count == 2
+        # Set, paste, then cleanup the invocation-specific buffer.
+        assert mock_run.call_count == 3
+
+    @patch("src.clipboard.uuid.uuid4")
+    @patch("src.clipboard.Clipboard.copy")
+    @patch("src.clipboard.SubprocessUtils.run_command_quiet")
+    def test_auto_paste_uses_and_cleans_an_invocation_specific_buffer(
+        self, mock_run, mock_copy, mock_uuid, mock_tmux_env
+    ):
+        mock_copy.return_value = True
+        mock_run.return_value = True
+        mock_uuid.return_value.hex = "invocation"
+
+        assert Clipboard.copy_and_paste("test text", pane_id="%0", auto_paste=True) is True
+
+        paste_buffer = "__tmux_flash_copy_paste_invocation__"
+        assert mock_run.call_args_list == [
+            call(["tmux", "set-buffer", "-b", paste_buffer, "test text"]),
+            call(["tmux", "paste-buffer", "-b", paste_buffer, "-t", "%0"]),
+            call(["tmux", "delete-buffer", "-b", paste_buffer]),
+        ]
 
     @patch("src.clipboard.Clipboard.copy")
     @patch("src.clipboard.SubprocessUtils.run_command_quiet")
     def test_copy_and_paste_auto_paste_without_pane_id(self, mock_run, mock_copy, mock_tmux_env):
-        """Test copy_and_paste with auto_paste but no pane_id only copies."""
+        """A requested paste without a target is not reported as successful."""
         mock_copy.return_value = True
 
         result = Clipboard.copy_and_paste("test text", pane_id=None, auto_paste=True)
 
-        assert result is True
+        assert result is False
         mock_copy.assert_called_once()
         mock_run.assert_not_called()
 
@@ -199,15 +228,41 @@ class TestClipboard:
 
     @patch("src.clipboard.Clipboard.copy")
     @patch("src.clipboard.SubprocessUtils.run_command_quiet")
-    def test_copy_and_paste_paste_fails_silently(self, mock_run, mock_copy, mock_tmux_env):
-        """Test copy_and_paste succeeds even if paste fails."""
+    def test_copy_and_paste_reports_paste_failure(self, mock_run, mock_copy, mock_tmux_env):
         mock_copy.return_value = True
-        mock_run.side_effect = Exception("Paste failed")
+        mock_run.side_effect = [True, False, True]
 
         result = Clipboard.copy_and_paste("test text", pane_id="%0", auto_paste=True)
 
-        # Should still return True since copy succeeded
-        assert result is True
+        assert result is False
+
+    @patch("src.clipboard.Clipboard.copy")
+    @patch("src.clipboard.SubprocessUtils.run_command_quiet")
+    def test_failed_paste_buffer_write_prevents_paste(self, mock_run, mock_copy, mock_tmux_env):
+        mock_copy.return_value = True
+        mock_run.side_effect = [False, True]
+
+        result = Clipboard.copy_and_paste("test text", pane_id="%0", auto_paste=True)
+
+        assert result is False
+        commands = [call.args[0] for call in mock_run.call_args_list]
+        assert any("set-buffer" in command for command in commands)
+        assert not any("paste-buffer" in command for command in commands)
+        assert any("delete-buffer" in command for command in commands)
+
+    @patch("src.clipboard.Clipboard.copy")
+    @patch("src.clipboard.SubprocessUtils.run_command_quiet")
+    def test_cleanup_failure_is_reported(self, mock_run, mock_copy, mock_tmux_env):
+        mock_copy.return_value = True
+        mock_run.side_effect = [True, True, False]
+        mock_logger = MagicMock()
+
+        result = Clipboard.copy_and_paste(
+            "test text", pane_id="%0", auto_paste=True, logger=mock_logger
+        )
+
+        assert result is False
+        mock_logger.log.assert_called_with("Auto-paste to pane %0: Failed to clean buffer")
 
     @patch("src.utils.SubprocessUtils.run_command_quiet")
     def test_tmux_osc52_method(self, mock_run):
@@ -324,7 +379,7 @@ class TestClipboard:
     @patch("src.clipboard.Clipboard.copy")
     @patch("src.clipboard.SubprocessUtils.run_command_quiet")
     def test_auto_paste_exception_handling(self, mock_run, mock_copy, mock_tmux_env):
-        """Test auto-paste failure is caught silently."""
+        """Test auto-paste exceptions are reported as failure."""
         mock_copy.return_value = True
         mock_run.side_effect = RuntimeError("Auto-paste failed")
         mock_logger = MagicMock()
@@ -334,7 +389,6 @@ class TestClipboard:
             "test text", pane_id="%0", auto_paste=True, logger=mock_logger
         )
 
-        # Copy should still succeed
-        assert result is True
+        assert result is False
         # Should log the failure
         mock_logger.log.assert_any_call("Auto-paste to pane %0: Failed")

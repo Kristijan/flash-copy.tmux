@@ -29,14 +29,14 @@ tmux-flash-copy tries several clipboard methods in order and stops at the first 
 
 **How it works**:
 
-- Uses the built-in OSC52 support available in tmux 3.2 or newer
+- Uses tmux's built-in OSC52 support (available since tmux 3.2)
 - tmux sends an OSC52 escape sequence to the terminal
 - The terminal intercepts the sequence and copies to system clipboard
 - No external tools required
 
 **Requirements**:
 
-- tmux 3.2 or newer
+- tmux 3.6b or newer (the plugin's minimum supported version)
 - Terminal with OSC52 support, such as Ghostty, Kitty, or Alacritty
 
 **Benefits**:
@@ -171,7 +171,7 @@ After reading the text from the IPC buffer, the parent copies it using one of th
 
 ```bash
 tmux -V
-# Should be 3.2 or newer
+# Should be 3.6b or newer
 ```
 
 **Check terminal OSC52 support**:

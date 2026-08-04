@@ -7,12 +7,16 @@ from src.search_interface import SearchMatch
 
 @dataclass(frozen=True)
 class RangeEndpoint:
-    """A character boundary selected from an overlaid search label."""
+    """A matched query selected from an overlaid search label."""
 
     offset: int
     line: int
     col: int
     label: str
+    match_start_pos: int
+    match_end_pos: int
+    match_start_col: int
+    match_end_col: int
     copy_start_pos: int
     copy_end_pos: int
     copy_start_col: int
@@ -29,6 +33,10 @@ class RangeEndpoint:
             line=match.line,
             col=match.label_col,
             label=label,
+            match_start_pos=match.start_pos + match.match_start,
+            match_end_pos=match.start_pos + match.match_end,
+            match_start_col=match.col + match.match_start,
+            match_end_col=match.col + match.match_end,
             copy_start_pos=match.copy_start_pos,
             copy_end_pos=match.copy_end_pos,
             copy_start_col=match.col + match.copy_start_pos - match.start_pos,
@@ -68,5 +76,8 @@ class ActiveRange:
 
         if copy_mode != "precise":
             raise ValueError(f"Unknown range copy mode: {copy_mode}")
-        lower, upper = sorted((self.start.offset, end_offset))
-        return pane_content[max(0, lower - 1) : upper]
+        end_match_start = end_match.start_pos + end_match.match_start
+        end_match_end = end_match.start_pos + end_match.match_end
+        lower = min(self.start.match_start_pos, end_match_start)
+        upper = max(self.start.match_end_pos, end_match_end)
+        return pane_content[lower:upper]

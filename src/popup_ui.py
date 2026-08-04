@@ -7,13 +7,19 @@ with a search interface, labels for matches, and handles user input.
 
 import contextlib
 import subprocess
+import uuid
 from pathlib import Path
 
 from src.clipboard import Clipboard
 from src.config import FlashCopyConfig
 from src.debug_logger import DebugLogger
+from src.popup_protocol import PopupExitCode
 from src.search_interface import SearchInterface, SearchMatch
 from src.utils import TmuxPaneUtils
+
+
+class PopupExecutionError(RuntimeError):
+    """Raised when popup transport or execution fails rather than being cancelled."""
 
 
 class PopupUI:
@@ -58,6 +64,17 @@ class PopupUI:
 
         return result
 
+    @staticmethod
+    def _delete_buffer(buffer_name: str) -> None:
+        """Delete a transient tmux buffer if it exists."""
+        with contextlib.suppress(subprocess.SubprocessError, OSError):
+            subprocess.run(
+                ["tmux", "delete-buffer", "-b", buffer_name],
+                capture_output=True,
+                check=False,
+                timeout=5,
+            )
+
     def _launch_popup(self) -> tuple[str | None, bool]:
         """
         Launch the tmux popup window.
@@ -70,14 +87,12 @@ class PopupUI:
         pane_dimensions = TmuxPaneUtils.get_pane_dimensions(self.pane_id)
 
         if pane_dimensions:
-            # Calculate popup position to perfectly overlay the pane
             popup_pos = TmuxPaneUtils.calculate_popup_position(pane_dimensions)
             popup_x = popup_pos["x"]
             popup_y = popup_pos["y"]
             popup_width = popup_pos["width"]
             popup_height = popup_pos["height"]
         else:
-            # Fallback: Get window dimensions if pane dimensions unavailable
             try:
                 result = subprocess.run(
                     ["tmux", "display-message", "-p", "#{window_width},#{window_height}"],
@@ -99,17 +114,10 @@ class PopupUI:
         plugin_dir = Path(__file__).parent.parent
         interactive_script = plugin_dir / "bin" / "tmux-flash-copy-interactive.py"
 
-        # Write pane content to tmux buffer for child process to read
-        # This avoids redundant pane capture in the interactive script
-        # If buffer write fails, child will fall back to capturing pane
-        # Use pane_id in buffer name to avoid conflicts with concurrent instances
-        pane_content_buffer = f"__tmux_flash_copy_pane_content_{self.pane_id}__"
-        with contextlib.suppress(subprocess.SubprocessError, OSError):
-            subprocess.run(
-                ["tmux", "set-buffer", "-b", pane_content_buffer, self.pane_content],
-                check=True,
-                timeout=5,
-            )
+        # Write pane content to an invocation-specific buffer for the child.
+        invocation_id = uuid.uuid4().hex
+        pane_content_buffer = f"__tmux_flash_copy_pane_content_{invocation_id}__"
+        result_buffer = f"__tmux_flash_copy_result_{invocation_id}__"
 
         # Launch tmux popup with the interactive UI
         # -E: close popup on exit
@@ -131,6 +139,10 @@ class PopupUI:
             str(interactive_script),
             "--pane-id",
             self.pane_id,
+            "--pane-content-buffer",
+            pane_content_buffer,
+            "--result-buffer",
+            result_buffer,
             "--reverse-search",
             str(self.search_interface.reverse_search),
             "--word-separators",
@@ -153,8 +165,7 @@ class PopupUI:
             "true" if self.config.debug_enabled else "false",
             "--debug-log-file",
             DebugLogger.get_instance().log_file if self.config.debug_enabled else "",
-            "--label-characters",
-            self.config.label_characters or "",
+            f"--label-characters={self.config.label_characters or ''}",
             "--auto-paste",
             "true" if self.config.auto_paste_enable else "false",
             "--idle-timeout",
@@ -163,8 +174,10 @@ class PopupUI:
             str(self.config.idle_warning),
             "--range-selection",
             "true" if self.config.range_selection_enable else "false",
-            "--range-selection-key",
-            self.config.range_selection_key,
+            "--copy-mode",
+            self.config.copy_mode,
+            "--mode-switch-key",
+            self.config.mode_switch_key,
             "--range-copy-mode",
             self.config.range_copy_mode,
             "--range-marker-fg-colour",
@@ -172,28 +185,45 @@ class PopupUI:
             "--range-marker-bg-colour",
             self.config.range_marker_bg_colour,
         ]
-
         logger = DebugLogger.get_instance()
 
         try:
-            # Run the popup command - it will close automatically with -E flag when script exits
-            # Timeout slightly longer than child's idle timeout (35s vs 30s child timeout)
-            # to allow child to exit gracefully before parent kills it
+            self._delete_buffer(result_buffer)
+            try:
+                subprocess.run(
+                    ["tmux", "set-buffer", "-b", pane_content_buffer, self.pane_content],
+                    check=True,
+                    timeout=5,
+                )
+            except (subprocess.SubprocessError, OSError) as error:
+                raise PopupExecutionError(
+                    "Could not initialize popup snapshot transport"
+                ) from error
+
+            # The interactive child owns idle expiry because user input resets its
+            # timer. A fixed parent timeout would cancel otherwise-active sessions.
             result = subprocess.run(
                 popup_cmd,
                 check=False,
-                timeout=35.0,
             )
 
             if logger.enabled:
                 logger.log(f"Popup closed with exit code: {result.returncode}")
 
-            # Read paste flag from exit code: 10 = paste, 0 = copy
-            should_paste = result.returncode == 10
+            if result.returncode == PopupExitCode.CANCEL:
+                if logger.enabled:
+                    logger.log("Popup cancelled")
+                return (None, False)
+
+            if result.returncode not in (PopupExitCode.COPY, PopupExitCode.PASTE):
+                if logger.enabled:
+                    logger.log(f"Popup failed with exit code: {result.returncode}")
+                raise PopupExecutionError(f"Popup failed with exit code {result.returncode}")
+
+            should_paste = result.returncode == PopupExitCode.PASTE
 
             # Read result from tmux buffer (written by child process)
             # Using pane-specific buffer names to avoid conflicts
-            result_buffer = f"__tmux_flash_copy_result_{self.pane_id}__"
             try:
                 if logger.enabled:
                     logger.log("Reading result from tmux buffer...")
@@ -212,24 +242,10 @@ class PopupUI:
                     else:
                         logger.log("Buffer read returned empty string")
 
-                # Clean up the result buffer after reading
-                subprocess.run(
-                    ["tmux", "delete-buffer", "-b", result_buffer],
-                    capture_output=True,
-                    check=False,
-                )
-
-                # Clean up the pane content buffer
-                subprocess.run(
-                    ["tmux", "delete-buffer", "-b", pane_content_buffer],
-                    capture_output=True,
-                    check=False,
-                )
             except subprocess.CalledProcessError as e:
-                # Buffer doesn't exist (user cancelled or error)
                 if logger.enabled:
                     logger.log(f"Buffer read FAILED: {e}")
-                result_text = None
+                raise PopupExecutionError("Could not read popup result transport") from e
 
             # Empty string means cancelled (ESC/Ctrl+C)
             # None means no output or buffer not found
@@ -246,23 +262,16 @@ class PopupUI:
                 logger.log("No result to return (cancelled or empty)")
             return (None, False)
 
-        except subprocess.TimeoutExpired:
+        except PopupExecutionError:
+            raise
+        except subprocess.TimeoutExpired as error:
             if logger.enabled:
                 logger.log("Popup timeout expired")
-            # Clean up pane content buffer
-            subprocess.run(
-                ["tmux", "delete-buffer", "-b", pane_content_buffer],
-                capture_output=True,
-                check=False,
-            )
-            return (None, False)
+            raise PopupExecutionError("Popup execution timed out") from error
         except Exception as e:
             if logger.enabled:
                 logger.log(f"Exception in _launch_popup: {e}")
-            # Clean up pane content buffer
-            subprocess.run(
-                ["tmux", "delete-buffer", "-b", pane_content_buffer],
-                capture_output=True,
-                check=False,
-            )
-            return (None, False)
+            raise PopupExecutionError("Unexpected popup execution failure") from e
+        finally:
+            self._delete_buffer(result_buffer)
+            self._delete_buffer(pane_content_buffer)

@@ -45,6 +45,10 @@ def test_endpoint_uses_the_boundary_after_the_matched_query():
     assert endpoint.line == 2
     assert endpoint.col == 7
     assert endpoint.label == "q"
+    assert endpoint.match_start_pos == 11
+    assert endpoint.match_end_pos == 13
+    assert endpoint.match_start_col == 5
+    assert endpoint.match_end_col == 7
 
 
 def test_endpoint_requires_a_label_or_fallback():
@@ -105,15 +109,24 @@ def test_distinct_endpoints_in_the_same_word_copy_the_whole_word():
     assert ActiveRange.from_match(left).extract(content, right) == "hello"
 
 
-def test_precise_range_includes_final_match_character_in_either_direction():
+def test_precise_range_includes_both_complete_queries_in_either_direction():
     content = "hello world"
     left = make_match(text="hello", start_pos=0, line=0, col=0, match_start=0, match_end=2)
     right = make_match(
         text="world", start_pos=6, line=0, col=6, match_start=0, match_end=1, label="s"
     )
 
-    assert ActiveRange.from_match(left).extract(content, right, copy_mode="precise") == "ello w"
-    assert ActiveRange.from_match(right).extract(content, left, copy_mode="precise") == "ello w"
+    assert ActiveRange.from_match(left).extract(content, right, copy_mode="precise") == "hello w"
+    assert ActiveRange.from_match(right).extract(content, left, copy_mode="precise") == "hello w"
+
+
+def test_precise_range_includes_overlapping_queries_in_the_same_word():
+    content = "hello"
+    search = SearchInterface(content, reverse_search=False)
+    left = search.search("hell")[0]
+    right = search.search("ello")[0]
+
+    assert ActiveRange.from_match(left).extract(content, right, copy_mode="precise") == "hello"
 
 
 def test_extracts_continuous_multiline_text_and_preserves_whitespace():
@@ -125,7 +138,7 @@ def test_extracts_continuous_multiline_text_and_preserves_whitespace():
 
     assert (
         ActiveRange.from_match(lower).extract(content, upper, copy_mode="precise")
-        == "e  \n  two\nth"
+        == "one  \n  two\nth"
     )
 
 
@@ -136,9 +149,7 @@ def test_extracts_unicode_by_character_boundary():
         text="🌙", start_pos=10, line=0, col=10, match_start=0, match_end=1, label="s"
     )
 
-    assert (
-        ActiveRange.from_match(left).extract(content, right, copy_mode="precise") == "βγ hello 🌙"
-    )
+    assert ActiveRange.from_match(left).extract(content, right, copy_mode="precise") == content
 
 
 def test_identical_endpoint_is_not_eligible_and_cannot_be_extracted():
@@ -170,7 +181,7 @@ def test_fallback_marker_allows_unlabelled_matches_for_enter_selection():
     active_range = ActiveRange.from_match(start, fallback_label=",")
 
     assert active_range.start.label == ","
-    assert active_range.extract("hello world", end, copy_mode="precise") == "ello w"
+    assert active_range.extract("hello world", end, copy_mode="precise") == "hello w"
 
 
 def test_search_excludes_offsets_and_reserves_labels_before_assignment():

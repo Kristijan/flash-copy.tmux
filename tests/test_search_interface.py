@@ -359,6 +359,15 @@ class TestSearchInterface:
 
         assert pattern1 is pattern2
 
+    def test_get_word_pattern_without_separators_compiles_non_whitespace_pattern(self):
+        """The uncached default pattern should match complete non-whitespace sequences."""
+        SearchInterface._pattern_cache.clear()
+
+        pattern = SearchInterface._get_word_pattern(None)
+
+        assert pattern.pattern == r"\S+"
+        assert pattern.findall("hello-world foo_bar") == ["hello-world", "foo_bar"]
+
     def test_get_word_pattern_escape_starting_caret(self):
         """Ensure _get_word_pattern handles separators starting with '^'."""
         # This exercises the escape_for_char_class branch where s.startswith("^")
