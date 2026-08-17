@@ -134,7 +134,7 @@ class Clipboard:
         operation_succeeded = False
         try:
             buffer_written = SubprocessUtils.run_command_quiet(
-                ["tmux", "set-buffer", "-b", paste_buffer, text]
+                ["tmux", "set-buffer", "-b", paste_buffer, "--", text]
             )
             if not buffer_written:
                 if logger:

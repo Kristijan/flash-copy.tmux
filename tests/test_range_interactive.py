@@ -45,7 +45,7 @@ def run_keys(monkeypatch, ui, keys):
     return selections
 
 
-def test_selection_is_written_to_the_parent_result_channel():
+def test_hyphen_leading_selection_is_written_to_the_parent_result_channel():
     interactive_cls = load_interactive_ui()
     result_buffer = "__tmux_flash_copy_result_invocation__"
     ui = interactive_cls(
@@ -60,11 +60,11 @@ def test_selection_is_written_to_the_parent_result_channel():
         patch("subprocess.run", return_value=MagicMock(returncode=0)) as mock_run,
         pytest.raises(SystemExit) as exit_info,
     ):
-        ui._save_result("hello", should_paste=True)
+        ui._save_result("-hello", should_paste=True)
 
     assert exit_info.value.code == 10
     mock_run.assert_called_once_with(
-        ["tmux", "set-buffer", "-b", result_buffer, "hello"],
+        ["tmux", "set-buffer", "-b", result_buffer, "--", "-hello"],
         check=True,
         capture_output=True,
     )
