@@ -189,11 +189,11 @@ class TestClipboard:
         mock_run.return_value = True
         mock_uuid.return_value.hex = "invocation"
 
-        assert Clipboard.copy_and_paste("test text", pane_id="%0", auto_paste=True) is True
+        assert Clipboard.copy_and_paste("-test text", pane_id="%0", auto_paste=True) is True
 
         paste_buffer = "__tmux_flash_copy_paste_invocation__"
         assert mock_run.call_args_list == [
-            call(["tmux", "set-buffer", "-b", paste_buffer, "test text"]),
+            call(["tmux", "set-buffer", "-b", paste_buffer, "--", "-test text"]),
             call(["tmux", "paste-buffer", "-b", paste_buffer, "-t", "%0"]),
             call(["tmux", "delete-buffer", "-b", paste_buffer]),
         ]

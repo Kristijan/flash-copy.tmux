@@ -12,6 +12,40 @@ from src.popup_ui import PopupExecutionError, PopupUI
 from src.search_interface import SearchInterface
 
 
+class TestPopupUITransport:
+    """Test tmux buffer transport argument passing in PopupUI."""
+
+    @patch("src.popup_ui.subprocess.run")
+    @patch("src.popup_ui.TmuxPaneUtils.get_pane_dimensions")
+    @patch("src.popup_ui.TmuxPaneUtils.calculate_popup_position")
+    @patch("src.popup_ui.DebugLogger.get_instance")
+    def test_snapshot_transport_terminates_options_before_hyphen_leading_content(
+        self, mock_get_instance, mock_calc_pos, mock_get_dims, mock_subprocess
+    ):
+        mock_get_instance.return_value = MagicMock(enabled=False, log_file="")
+        mock_get_dims.return_value = MagicMock()
+        mock_calc_pos.return_value = {"x": 0, "y": 0, "width": 100, "height": 20}
+        mock_subprocess.return_value = MagicMock(returncode=0, stdout="")
+        pane_content = "-rw-r--r--@ 1 user staff AGENTS.md"
+        search_interface = MagicMock(spec=SearchInterface)
+        search_interface.reverse_search = True
+        search_interface.word_separators = ""
+        popup_ui = PopupUI(
+            pane_content=pane_content,
+            search_interface=search_interface,
+            clipboard=MagicMock(spec=Clipboard),
+            pane_id="test_pane",
+            config=FlashCopyConfig(),
+        )
+
+        popup_ui.run()
+
+        set_buffer_command = next(
+            call.args[0] for call in mock_subprocess.call_args_list if "set-buffer" in call.args[0]
+        )
+        assert set_buffer_command[-2:] == ["--", pane_content]
+
+
 class TestPopupUIAutoPaste:
     """Test auto-paste argument passing in PopupUI."""
 

@@ -794,7 +794,7 @@ class InteractiveUI:
                 logger.log(f"Auto-paste: {should_paste}")
 
             result = subprocess.run(
-                ["tmux", "set-buffer", "-b", self.result_buffer, text],
+                ["tmux", "set-buffer", "-b", self.result_buffer, "--", text],
                 check=True,
                 capture_output=True,
             )

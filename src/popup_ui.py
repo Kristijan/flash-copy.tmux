@@ -191,7 +191,14 @@ class PopupUI:
             self._delete_buffer(result_buffer)
             try:
                 subprocess.run(
-                    ["tmux", "set-buffer", "-b", pane_content_buffer, self.pane_content],
+                    [
+                        "tmux",
+                        "set-buffer",
+                        "-b",
+                        pane_content_buffer,
+                        "--",
+                        self.pane_content,
+                    ],
                     check=True,
                     timeout=5,
                 )
