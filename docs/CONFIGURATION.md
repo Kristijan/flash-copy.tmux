@@ -20,6 +20,7 @@ The following configuration options are supported. Default values are listed, wi
 | Option                                                                    | Description                                  |
 | ------------------------------------------------------------------------- | -------------------------------------------- |
 | [`@flash-copy-bind-key`](#flash-copy-bind-key-default-f)                  | Key binding to activate tmux-flash-copy      |
+| [`@flash-copy-bind-key-mode`](#flash-copy-bind-key-mode-default-prefix)   | Key table for the activation binding         |
 | [`@flash-copy-word-separators`](#flash-copy-word-separators)              | Characters that define word boundaries       |
 | [`@flash-copy-case-sensitive`](#flash-copy-case-sensitive-default-off)    | Case-sensitive searching                     |
 | [`@flash-copy-reverse-search`](#flash-copy-reverse-search-default-on)     | Direction of label assignment when searching |
@@ -65,6 +66,20 @@ set -g @flash-copy-bind-key "C-f"
 
 # Or use Alt+F
 set -g @flash-copy-bind-key "M-f"
+```
+
+### `@flash-copy-bind-key-mode` (default: `prefix`)
+
+Controls which tmux key table contains the activation binding:
+
+- `prefix`: Activate the plugin with `<prefix>` followed by `@flash-copy-bind-key`.
+- `root`: Activate the plugin by pressing `@flash-copy-bind-key` directly, without the tmux prefix.
+
+Values other than `prefix` or `root` fall back to `prefix`. A root-table binding takes precedence over the same key being sent to applications running inside tmux.
+
+```bash
+# Launch tmux-flash-copy without pressing the tmux prefix first
+set -g @flash-copy-bind-key-mode "root"
 ```
 
 ### `@flash-copy-word-separators`
