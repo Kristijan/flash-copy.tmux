@@ -65,9 +65,9 @@ A tmux plugin inspired by [flash.nvim](https://github.com/folke/flash.nvim) that
 
 <details>
 
-<summary>Using TPM (recommended)</summary>
+<summary>Using TPM Redux (recommended)</summary>
 
-1. Install [TPM (Tmux Plugin Manager)](https://github.com/tmux-plugins/tpm).
+1. Install [TPM Redux (Tmux Plugin Manager)](https://github.com/RyanMacG/tpm-redux).
 
 2. Add `tmux-flash-copy` to your `~/.tmux.conf`:
 
