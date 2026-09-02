@@ -51,6 +51,20 @@ class Clipboard:
         return SubprocessUtils.run_command_quiet(["tmux", "set-buffer", "--", text])
 
     @staticmethod
+    def _paste_targets(pane_id: str) -> list[str]:
+        """Return panes that should receive input sent to the target pane."""
+        synchronized = SubprocessUtils.run_command(
+            ["tmux", "display-message", "-p", "-t", pane_id, "#{synchronize-panes}"]
+        )
+        if synchronized != "1":
+            return [pane_id]
+
+        panes = SubprocessUtils.run_command(
+            ["tmux", "list-panes", "-t", pane_id, "-F", "#{pane_id}"]
+        )
+        return panes.splitlines()
+
+    @staticmethod
     def copy(text: str, logger=None, client_name: str | None = None) -> bool:
         """Copy text to clipboard using available methods.
 
@@ -140,9 +154,13 @@ class Clipboard:
                 if logger:
                     logger.log(f"Auto-paste to pane {pane_id}: Failed to write buffer")
             else:
-                operation_succeeded = SubprocessUtils.run_command_quiet(
-                    ["tmux", "paste-buffer", "-b", paste_buffer, "-t", pane_id]
-                )
+                paste_results = [
+                    SubprocessUtils.run_command_quiet(
+                        ["tmux", "paste-buffer", "-b", paste_buffer, "-t", target]
+                    )
+                    for target in Clipboard._paste_targets(pane_id)
+                ]
+                operation_succeeded = bool(paste_results) and all(paste_results)
             if buffer_written and not operation_succeeded and logger:
                 logger.log(f"Auto-paste to pane {pane_id}: Failed")
         except Exception:

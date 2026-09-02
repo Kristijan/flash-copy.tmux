@@ -198,6 +198,32 @@ class TestClipboard:
             call(["tmux", "delete-buffer", "-b", paste_buffer]),
         ]
 
+    @patch("src.clipboard.uuid.uuid4")
+    @patch("src.clipboard.Clipboard.copy")
+    @patch("src.clipboard.SubprocessUtils.run_command")
+    @patch("src.clipboard.SubprocessUtils.run_command_quiet")
+    def test_auto_paste_targets_every_pane_when_synchronization_is_enabled(
+        self, mock_run_quiet, mock_run, mock_copy, mock_uuid, mock_tmux_env
+    ):
+        mock_copy.return_value = True
+        mock_run_quiet.return_value = True
+        mock_run.side_effect = ["1", "%0\n%1"]
+        mock_uuid.return_value.hex = "invocation"
+
+        assert Clipboard.copy_and_paste("test text", pane_id="%0", auto_paste=True) is True
+
+        paste_buffer = "__tmux_flash_copy_paste_invocation__"
+        assert mock_run.call_args_list == [
+            call(["tmux", "display-message", "-p", "-t", "%0", "#{synchronize-panes}"]),
+            call(["tmux", "list-panes", "-t", "%0", "-F", "#{pane_id}"]),
+        ]
+        assert mock_run_quiet.call_args_list == [
+            call(["tmux", "set-buffer", "-b", paste_buffer, "--", "test text"]),
+            call(["tmux", "paste-buffer", "-b", paste_buffer, "-t", "%0"]),
+            call(["tmux", "paste-buffer", "-b", paste_buffer, "-t", "%1"]),
+            call(["tmux", "delete-buffer", "-b", paste_buffer]),
+        ]
+
     @patch("src.clipboard.Clipboard.copy")
     @patch("src.clipboard.SubprocessUtils.run_command_quiet")
     def test_copy_and_paste_auto_paste_without_pane_id(self, mock_run, mock_copy, mock_tmux_env):
