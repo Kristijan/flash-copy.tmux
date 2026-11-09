@@ -7,6 +7,7 @@ and handling user input for label selection.
 """
 
 import argparse
+import codecs
 import math
 import os
 import select
@@ -47,6 +48,7 @@ class InteractiveUI:
         dimensions: dict,
         config: FlashCopyConfig,
         result_buffer: str | None = None,
+        floating_pane: bool = False,
     ):
         """
         Initialise the interactive UI.
@@ -57,6 +59,7 @@ class InteractiveUI:
             dimensions: Pane dimensions dict
             config: FlashCopyConfig with all configuration options
             result_buffer: Invocation-specific tmux buffer for the result
+            floating_pane: Disable popup-only idle expiry for a non-modal search
         """
         self.pane_id = pane_id
         self.pane_content = pane_content
@@ -65,6 +68,10 @@ class InteractiveUI:
         self.dimensions = dimensions
         self.config = config
         self.result_buffer = result_buffer
+        self.floating_pane = floating_pane
+        self._input_decoder = codecs.getincrementaldecoder(sys.stdin.encoding or "utf-8")(
+            errors="replace"
+        )
         # Use plain text for searching
         self.search_interface = SearchInterface(
             self.pane_content_plain,
@@ -152,45 +159,28 @@ class InteractiveUI:
         """
         try:
             fd = sys.stdin.fileno()
-
-            # Check if stdin is a TTY before attempting to set raw mode
-            if not os.isatty(fd):
-                # If not a TTY (e.g., in a tmux popup), use select and read directly
-                readable, _, _ = select.select([sys.stdin], [], [], 0.1)
-                if not readable:
-                    return ""
-                char = sys.stdin.read(1)
-                if not char:  # EOF
-                    return ControlChars.CTRL_C  # Treat EOF as Ctrl+C
-                # Check for escape sequences
-                if char == ControlChars.ESC:
-                    return self._handle_escape_sequence()
-                return char
-
-            # For TTY, set raw mode first, then use select
-            old_settings = termios.tcgetattr(fd)
+            old_settings = termios.tcgetattr(fd) if os.isatty(fd) else None
             try:
-                tty.setraw(fd)
-                # Use select to check if input is available (0.1 second timeout)
-                # This allows us to return to the main loop to check idle timeout
+                if old_settings is not None:
+                    tty.setraw(fd, termios.TCSANOW)
                 readable, _, _ = select.select([fd], [], [], 0.1)
-
                 if not readable:
-                    # No input available, return empty string to continue loop
                     return ""
-
-                char = sys.stdin.read(1)
-                if not char:  # EOF
-                    return ControlChars.CTRL_C  # Treat EOF as Ctrl+C
-                # Check for escape sequences
+                # TextIOWrapper.read() can read ahead, hiding subsequent keys
+                # from select(). Decode unbuffered bytes incrementally instead.
+                data = os.read(fd, 1)
+                if not data:
+                    return ControlChars.CTRL_C
+                char = self._input_decoder.decode(data)
                 if char == ControlChars.ESC:
                     return self._handle_escape_sequence()
                 return char
             finally:
-                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+                if old_settings is not None:
+                    termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
         except Exception as e:
             print(f"Error reading input: {e}", file=sys.stderr)
-            return ControlChars.CTRL_C  # Treat any error as Ctrl+C
+            return ControlChars.CTRL_C
 
     def _handle_escape_sequence(self) -> str:
         """
@@ -593,7 +583,7 @@ class InteractiveUI:
                 # Check for idle timeout
                 elapsed = time.time() - self.start_time
 
-                if elapsed >= self.config.idle_timeout:
+                if not self.floating_pane and elapsed >= self.config.idle_timeout:
                     # Timeout exceeded - exit gracefully
                     if self.debug_logger and self.debug_logger.enabled:
                         self.debug_logger.log(
@@ -606,7 +596,8 @@ class InteractiveUI:
                 # Only show warning if idle_warning < idle_timeout
                 warning_threshold = self.config.idle_timeout - self.config.idle_warning
                 if (
-                    elapsed >= warning_threshold
+                    not self.floating_pane
+                    and elapsed >= warning_threshold
                     and not self.timeout_warning_shown
                     and self.config.idle_warning < self.config.idle_timeout
                 ):
@@ -819,6 +810,9 @@ def main():
     parser = argparse.ArgumentParser(description="Interactive search UI for tmux-flash-copy")
     parser.add_argument("--pane-id", required=True, help="The tmux pane ID")
     parser.add_argument(
+        "--floating-pane", action="store_true", help="Run without popup idle expiry"
+    )
+    parser.add_argument(
         "--pane-content-buffer",
         required=True,
         help="Invocation-specific tmux buffer containing the captured pane",
@@ -946,6 +940,7 @@ def main():
             dimensions,
             config,
             result_buffer=args.result_buffer,
+            floating_pane=args.floating_pane,
         )
         ui.run()
 

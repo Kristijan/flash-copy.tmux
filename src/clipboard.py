@@ -60,7 +60,16 @@ class Clipboard:
             return [pane_id]
 
         panes = SubprocessUtils.run_command(
-            ["tmux", "list-panes", "-t", pane_id, "-F", "#{pane_id}"]
+            [
+                "tmux",
+                "list-panes",
+                "-t",
+                pane_id,
+                "-f",
+                "#{!:#{@flash-copy-source-pane}}",
+                "-F",
+                "#{pane_id}",
+            ]
         )
         return panes.splitlines()
 

@@ -136,32 +136,40 @@ When OSC52 fails, the plugin falls back to platform-specific clipboard utilities
 
 ## Internal IPC buffer
 
-### The `__tmux_flash_copy_result__%X__` buffer
+### Invocation-specific buffers
 
-The plugin uses a tmux buffer named `__tmux_flash_copy_result__%X__`, where `%X` is the calling pane ID, for communication between the parent process and the interactive popup UI.
+The plugin uses `__tmux_flash_copy_pane_content_<invocation>__` for the immutable source
+snapshot and `__tmux_flash_copy_result_<invocation>__` for the selection. Each invocation
+uses a unique identifier, so simultaneous searches do not share transport state.
 
 **Purpose**: Inter-process communication (IPC)
 
 **How it works**:
 
-- When the user selects text in the popup, the selection is stored in this named buffer
-- The parent process reads from this buffer after the popup closes
+- When the user selects text in the popup or floating search, it is stored in its result buffer
+- The parent reads that buffer after the interactive child completes
 - The buffer is immediately deleted after reading
 - The text is then copied to the system clipboard using one of the methods above
 
 **Key points**:
 
 - This buffer is **separate** from clipboard operations
-- It's used only for passing data from the popup to the parent process
+- It's used only for passing data from the search UI to the parent process
 - It exists only briefly (written → read → deleted)
 - The double underscores (`__`) identify it as an internal buffer
 - Users will never interact with this buffer directly
 
 **Why a tmux buffer for IPC?**
 
-The plugin runs the interactive UI inside a `tmux display-popup`, which creates a pseudo-terminal. Standard output from the popup process cannot be captured by the parent, so we use a tmux buffer as a temporary storage mechanism.
+Both `display-popup` and `new-pane` give the interactive UI its own pseudo-terminal.
+The parent waits for completion and retrieves the selection through tmux buffers.
+Snapshot and result buffers are cleaned up on completion, cancellation, or failure.
 
-After reading the text from the IPC buffer, the parent copies it using one of the clipboard methods described above.
+Clipboard delivery explicitly targets the client that originally launched the search,
+even if another client interacts with a shared floating pane. Auto-paste targets the
+original source pane; with synchronization enabled, it targets that window's panes but
+excludes all flash-copy helpers. Helpers also opt out of native synchronized typing in
+both directions, without changing the source window's synchronization setting.
 
 ## Troubleshooting
 

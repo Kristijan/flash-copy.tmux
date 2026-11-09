@@ -253,7 +253,10 @@ set -g @flash-copy-prompt-placeholder-text ""
 
 ### `@flash-copy-idle-timeout` (default: `15`)
 
-Controls the idle timeout in seconds before the popup automatically exits.
+Controls the idle timeout in seconds before the **modal popup** automatically exits.
+This option is ignored by non-modal floating searches on recognized stable tmux servers
+3.8+: those searches remain open without idle expiry. Older supported, development, and
+unrecognized/custom versions continue to use the popup.
 
 - Default: `15` seconds
 - Minimum: `1` second (values less than 1 are ignored)
@@ -268,7 +271,8 @@ set -g @flash-copy-idle-timeout "30"
 
 ### `@flash-copy-idle-warning` (default: `5`)
 
-Controls when the idle timeout warning appears, measured in seconds before the timeout.
+Controls when the modal popup's idle timeout warning appears, measured in seconds before
+the timeout. Floating searches have no idle warning and ignore this option.
 
 - Default: `5` seconds (warning appears 5 seconds before timeout)
 - Minimum: `0` seconds (negative values are treated as `0`)

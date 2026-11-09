@@ -36,7 +36,7 @@ def test_entrypoint_propagates_copy_or_paste_failure(monkeypatch, capsys):
     monkeypatch.setattr(module, "Clipboard", MagicMock(return_value=clipboard))
 
     with pytest.raises(SystemExit) as exit_info:
-        module.main("%1", "client-1")
+        module.main("%1", "client-1", "3.7")
 
     assert exit_info.value.code == 1
     assert "Clipboard copy/paste operation failed" in capsys.readouterr().err

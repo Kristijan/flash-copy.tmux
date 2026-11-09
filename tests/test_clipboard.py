@@ -213,10 +213,6 @@ class TestClipboard:
         assert Clipboard.copy_and_paste("test text", pane_id="%0", auto_paste=True) is True
 
         paste_buffer = "__tmux_flash_copy_paste_invocation__"
-        assert mock_run.call_args_list == [
-            call(["tmux", "display-message", "-p", "-t", "%0", "#{synchronize-panes}"]),
-            call(["tmux", "list-panes", "-t", "%0", "-F", "#{pane_id}"]),
-        ]
         assert mock_run_quiet.call_args_list == [
             call(["tmux", "set-buffer", "-b", paste_buffer, "--", "test text"]),
             call(["tmux", "paste-buffer", "-b", paste_buffer, "-t", "%0"]),

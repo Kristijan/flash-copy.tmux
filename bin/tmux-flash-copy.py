@@ -7,6 +7,7 @@ current tmux pane, label it with keyboard shortcuts, and copy it to the clipboar
 """
 
 import argparse
+import contextlib
 import sys
 from pathlib import Path
 
@@ -28,14 +29,23 @@ from src.debug_logger import (  # noqa: E402
     get_tmux_version,
     get_tmux_windows,
 )
+from src.floating_pane import FloatingPane, supports_floating_panes  # noqa: E402
 from src.pane_capture import PaneCapture  # noqa: E402
 from src.popup_ui import PopupUI  # noqa: E402
 from src.search_interface import SearchInterface  # noqa: E402
 
 
-def main(pane_id: str, client_name: str):
-    """Main entry point for the tmux-flash-copy plugin."""
+def main(pane_id: str, client_name: str, tmux_version: str):
+    """Run a search using the serving tmux version supplied by the binding."""
+    stack = contextlib.ExitStack()
     try:
+        floating = None
+        if supports_floating_panes(tmux_version):
+            floating = stack.enter_context(FloatingPane(pane_id, client_name))
+            if floating.reused:
+                return
+            pane_id = floating.pane_id
+
         # Capture pane contents
         capture = PaneCapture(pane_id)
         pane_content = capture.capture_pane()
@@ -146,6 +156,8 @@ def main(pane_id: str, client_name: str):
             clipboard=clipboard,
             pane_id=pane_id,
             config=config,
+            client_name=client_name,
+            floating=floating,
         )
 
         # Run the interactive search interface
@@ -173,11 +185,14 @@ def main(pane_id: str, client_name: str):
         error_msg = f"Error: {e}\n{traceback.format_exc()}"
         print(error_msg, file=sys.stderr)
         sys.exit(1)
+    finally:
+        stack.close()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--pane-id", required=True)
     parser.add_argument("--client-name", required=True)
+    parser.add_argument("--tmux-version", required=True)
     args = parser.parse_args()
-    main(args.pane_id, args.client_name)
+    main(args.pane_id, args.client_name, args.tmux_version)

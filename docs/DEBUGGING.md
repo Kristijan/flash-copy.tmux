@@ -86,7 +86,10 @@ This serves as a visual reminder that debug logging is enabled.
 
 ## Idle timeout
 
-To prevent the popup from blocking indefinitely if left open, tmux-flash-copy includes an **automatic idle timeout**:
+The **modal popup** includes an automatic idle timeout to prevent indefinite input blocking.
+Recognized stable tmux servers 3.8+ instead use non-modal floating panes: those searches have
+no idle timeout or warning. The settings and events below apply only to the popup backend
+(older supported servers, development builds, and unrecognized/custom versions).
 
 ### Behaviour
 
@@ -118,6 +121,12 @@ The timeout serves as a safety mechanism to:
 ### Timeout Ownership
 
 The interactive child exclusively owns idle expiry. Its configurable timer defaults to 15 seconds, resets after every keypress, and exits the popup when the user has actually been idle for that duration. The parent waits for `display-popup` without a fixed deadline; otherwise a user who remains active could be interrupted despite continuously resetting the child's timer.
+
+For floating searches, the binding backgrounds the worker to release the interactive
+client's command queue. The worker waits on `new-pane -W` for the actual child exit status,
+without an idle deadline. It cancels the search if the source geometry changes, the source
+disappears, or the launching client disconnects. Merely switching focus/windows/sessions
+does not cancel it. Helpers opt out of synchronized typing and inherited dead-pane retention.
 
 The warning defaults to 5 seconds before expiry, appearing after 10 idle seconds with the default settings.
 
