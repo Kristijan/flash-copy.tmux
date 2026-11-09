@@ -51,7 +51,26 @@ jobs:
       - name: Install the project
         run: uv sync --locked --all-extras --dev
 
+      - name: Build tmux 3.8 for native floating-pane tests
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libevent-dev libncurses-dev bison
+          build_dir="$(mktemp -d)"
+          curl --fail --location --retry 3 \
+            https://github.com/tmux/tmux/releases/download/3.8/tmux-3.8.tar.gz \
+            --output "$build_dir/tmux.tar.gz"
+          echo "e79c699c7e949dccd0a4a125e17b8d1261e311b16979dbc8eb34542f3966d82e  $build_dir/tmux.tar.gz" | sha256sum --check
+          tar -xzf "$build_dir/tmux.tar.gz" -C "$build_dir"
+          cd "$build_dir/tmux-3.8"
+          ./configure --prefix="$RUNNER_TEMP/tmux-3.8"
+          make -j2
+          make install
+          echo "$RUNNER_TEMP/tmux-3.8/bin" >> "$GITHUB_PATH"
+
       - name: Run tests with pytest
+        env:
+          FLASH_COPY_REQUIRE_TMUX: "1"
         run: uv run pytest --cov=src --cov-report=term-missing --cov-report=xml
 
       - name: Upload coverage to Codecov

@@ -1,8 +1,7 @@
 """
-Popup UI module for the interactive search interface.
+Search UI transport for tmux popups and non-modal floating panes.
 
-This module creates a tmux popup window that displays the pane content
-with a search interface, labels for matches, and handles user input.
+Both backends share immutable snapshot/result buffers and child exit statuses.
 """
 
 import contextlib
@@ -13,6 +12,7 @@ from pathlib import Path
 from src.clipboard import Clipboard
 from src.config import FlashCopyConfig
 from src.debug_logger import DebugLogger
+from src.floating_pane import FloatingPane
 from src.popup_protocol import PopupExitCode
 from src.search_interface import SearchInterface, SearchMatch
 from src.utils import TmuxPaneUtils
@@ -23,7 +23,7 @@ class PopupExecutionError(RuntimeError):
 
 
 class PopupUI:
-    """Manages the interactive popup UI for searching and selecting."""
+    """Run an interactive search over the source pane."""
 
     def __init__(
         self,
@@ -32,6 +32,8 @@ class PopupUI:
         clipboard: Clipboard,
         pane_id: str,
         config: FlashCopyConfig,
+        client_name: str | None = None,
+        floating: FloatingPane | None = None,
     ):
         """
         Initialise the popup UI.
@@ -42,12 +44,16 @@ class PopupUI:
             clipboard: Clipboard instance for copying
             pane_id: The tmux pane ID
             config: FlashCopyConfig with all configuration options
+            client_name: Explicit popup/clipboard client identity
+            floating: Active floating search ownership, or None for a popup
         """
         self.pane_content = pane_content
         self.search_interface = search_interface
         self.clipboard = clipboard
         self.pane_id = pane_id
         self.config = config
+        self.client_name = client_name
+        self.floating = floating
         self.search_query = ""
         self.current_matches: list[SearchMatch] = []
 
@@ -83,8 +89,12 @@ class PopupUI:
             Tuple of (text, should_paste) where text is the copied text if selection
             was made (None if cancelled) and should_paste is True if auto-paste is enabled
         """
-        # Get pane dimensions for seamless overlay positioning
-        pane_dimensions = TmuxPaneUtils.get_pane_dimensions(self.pane_id)
+        # Floating geometry is captured under its per-source setup lock.
+        pane_dimensions = (
+            self.floating.dimensions
+            if self.floating
+            else TmuxPaneUtils.get_pane_dimensions(self.pane_id)
+        )
 
         if pane_dimensions:
             popup_pos = TmuxPaneUtils.calculate_popup_position(pane_dimensions)
@@ -136,6 +146,10 @@ class PopupUI:
             str(popup_width),
             "-h",
             str(popup_height),
+        ]
+        if self.client_name:
+            popup_cmd.extend(["-c", self.client_name])
+        interactive_cmd = [
             str(interactive_script),
             "--pane-id",
             self.pane_id,
@@ -185,6 +199,9 @@ class PopupUI:
             "--range-marker-bg-colour",
             self.config.range_marker_bg_colour,
         ]
+        if self.floating:
+            interactive_cmd.append("--floating-pane")
+        popup_cmd.extend(interactive_cmd)
         logger = DebugLogger.get_instance()
 
         try:
@@ -207,27 +224,23 @@ class PopupUI:
                     "Could not initialize popup snapshot transport"
                 ) from error
 
-            # The interactive child owns idle expiry because user input resets its
-            # timer. A fixed parent timeout would cancel otherwise-active sessions.
-            result = subprocess.run(
-                popup_cmd,
-                check=False,
-            )
+            # Only the worker waits; the invoking client's command queue is free.
+            # Popup idle expiry remains child-owned; floating mode has no expiry.
+            if self.floating:
+                returncode = self.floating.run(interactive_cmd)
+            else:
+                returncode = subprocess.run(popup_cmd, check=False).returncode
 
             if logger.enabled:
-                logger.log(f"Popup closed with exit code: {result.returncode}")
+                logger.log(f"Search closed with exit code: {returncode}")
 
-            if result.returncode == PopupExitCode.CANCEL:
-                if logger.enabled:
-                    logger.log("Popup cancelled")
+            if returncode == PopupExitCode.CANCEL:
                 return (None, False)
 
-            if result.returncode not in (PopupExitCode.COPY, PopupExitCode.PASTE):
-                if logger.enabled:
-                    logger.log(f"Popup failed with exit code: {result.returncode}")
-                raise PopupExecutionError(f"Popup failed with exit code {result.returncode}")
+            if returncode not in (PopupExitCode.COPY, PopupExitCode.PASTE):
+                raise PopupExecutionError(f"Search failed with exit code {returncode}")
 
-            should_paste = result.returncode == PopupExitCode.PASTE
+            should_paste = returncode == PopupExitCode.PASTE
 
             # Read result from tmux buffer (written by child process)
             # Using pane-specific buffer names to avoid conflicts

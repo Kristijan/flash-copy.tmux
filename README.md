@@ -58,7 +58,7 @@ A tmux plugin inspired by [flash.nvim](https://github.com/folke/flash.nvim) that
 
 ## Requirements
 
-- [tmux](https://github.com/tmux/tmux) 3.6b+ (tested with tmux 3.7b)
+- [tmux](https://github.com/tmux/tmux) 3.6b+ (non-modal floating panes require 3.8+)
 - [Python](https://www.python.org) 3.10+ (tested with Python 3.14.6)
 
 ## Installation
@@ -123,7 +123,7 @@ A tmux plugin inspired by [flash.nvim](https://github.com/folke/flash.nvim) that
 2. Type to search for words in the pane. The search is dynamic and updates as you type.
 3. Matching words will be highlighted in yellow with single-character labels in green.
 4. Press a label key. In the default word mode, its word is copied immediately. In range mode, it pins the first endpoint so you can search for and select the second.
-5. The completed word or range is copied to your clipboard, and you are returned to your pane.
+5. The completed word or range is copied to your clipboard and the search closes.
 
 ### Keybindings when search is active
 
@@ -134,7 +134,7 @@ A tmux plugin inspired by [flash.nvim](https://github.com/folke/flash.nvim) that
 | `Enter`          | Select the first match (determined by `@flash-copy-reverse-search` setting) |
 | `;`+`<label>`    | Copy and auto-paste the word or completed range (if auto-paste enabled)     |
 | `,`+`<label>`    | Use the copy mode opposite to `@flash-copy-mode` for this selection         |
-| `Ctrl+C` / `ESC` | Cancel and close the popup without copying                                  |
+| `Ctrl+C` / `ESC` | Cancel and close the search without copying                                 |
 
 ### Auto-paste text
 

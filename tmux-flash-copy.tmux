@@ -26,7 +26,7 @@ case "${bind_key_mode}" in
     *) bind_key_mode="prefix" ;;
 esac
 
-# Bind the key to trigger the flash-copy interactive mode. Capture runtime identity
-# while tmux still has the key event's pane and client context.
-tmux bind-key -T "${bind_key_mode}" "${bind_key}" run-shell \
-    "\"${PLUGIN_DIR}/bin/tmux-flash-copy.py\" --pane-id \"#{pane_id}\" --client-name \"#{client_name}\""
+# Capture server identity at the key event. Background the worker so ordinary
+# pane input is not queued behind a long-lived non-modal search.
+tmux bind-key -T "${bind_key_mode}" "${bind_key}" run-shell -b \
+    "\"${PLUGIN_DIR}/bin/tmux-flash-copy.py\" --pane-id \"#{pane_id}\" --client-name \"#{client_name}\" --tmux-version \"#{version}\""

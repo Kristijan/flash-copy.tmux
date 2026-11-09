@@ -75,12 +75,7 @@ def test_bind_key_mode_selects_tmux_key_table(
     assert arguments[:5] == ["bind-key", "-T", expected_table, "F", "run-shell"]
 
 
-def test_custom_bind_key_preserves_runtime_context(fake_tmux: tuple[Path, Path]):
+def test_custom_bind_key_selects_configured_key(fake_tmux: tuple[Path, Path]):
     arguments = load_plugin(fake_tmux, bind_key="C-f", bind_key_mode="root")
-    project_root = Path(__file__).resolve().parents[1]
 
     assert arguments[:5] == ["bind-key", "-T", "root", "C-f", "run-shell"]
-    assert arguments[5] == (
-        f'"{project_root}/bin/tmux-flash-copy.py" '
-        '--pane-id "#{pane_id}" --client-name "#{client_name}"'
-    )

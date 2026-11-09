@@ -49,6 +49,13 @@ This document explains how to set up your local development environment and run 
    git --version
    ```
 
+4. **tmux 3.8+** for native floating-search integration tests.
+
+   These tests use disposable servers and attached pseudo-terminals, never your active tmux
+   session. They skip locally when tmux is absent or too old. Set
+   `FLASH_COPY_REQUIRE_TMUX=1` to make an unavailable/unsupported runtime an error instead,
+   as CI does.
+
 ## Setting up the development environment
 
 ### 1. Clone the repository
@@ -182,6 +189,11 @@ Tests live under `tests/` and follow pytest's `test_*.py` naming convention.
 | `test_pane_capture.py`      | Pane capture and dimensions                               |
 | `test_popup_ui.py`          | Popup arguments, errors, timeouts, and cleanup            |
 | `test_range_interactive.py` | Two-stage range-selection interaction                     |
+| `test_floating_pane.py`     | Native scrollbar and source geometry preservation          |
+| `test_floating_lifecycle.py` | Reentry, ownership, cancellation, and synchronized input  |
+| `test_floating_errors.py`   | Version boundaries, execution errors, and recovery         |
+| `test_floating_transport.py` | Lost/corrupt launch replies and failure cleanup           |
+| `test_floating_selection.py` | Real terminal selection and floating idle persistence     |
 | `test_range_selection.py`   | Range boundaries, extraction, and endpoint rules          |
 | `test_search_interface.py`  | Search matching and label assignment                      |
 | `test_utils.py`             | Subprocess and tmux utility functions                     |
@@ -199,6 +211,11 @@ Tests run automatically on every pull request to `main`.
 1. Type checking, linting, and formatting on Python 3.14
 2. Tests with coverage on Python 3.10, 3.11, 3.12, 3.13, and 3.14
 3. Uploads coverage to Codecov from the Python 3.14 test run
+
+Every Python test job builds the pinned tmux 3.8 release after verifying its SHA-256 checksum.
+Native tests are required, not silently skipped, so the uploaded coverage includes the
+floating backend's real lifecycle, error handling, and selection behavior. The existing
+Codecov coverage requirements remain unchanged.
 
 ### Running CI checks locally
 

@@ -1,7 +1,12 @@
 """Interaction tests for the two-stage range selection flow."""
 
 import importlib.util
+import os
+import pty
 import subprocess
+import sys
+import termios
+import tty
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -433,3 +438,32 @@ def test_precise_pinned_highlight_restores_the_pane_style_after_the_query(monkey
     rendered_line = ui._overlay_pinned_endpoint("\033[31mhello world\033[0m", 0, "hello world")
 
     assert "\033[0m\033[31mllo world" in rendered_line
+
+
+@pytest.mark.parametrize("terminal_input", [False, True], ids=["pipe", "pty"])
+def test_burst_input_renders_every_character_without_waiting_for_another_key(
+    monkeypatch, capsys, terminal_input
+):
+    """Neither text buffering nor raw-mode setup may drop queued UTF-8 input."""
+    if terminal_input:
+        write_fd, read_fd = pty.openpty()
+        tty.setraw(read_fd, termios.TCSANOW)
+    else:
+        read_fd, write_fd = os.pipe()
+    ui = load_interactive_ui()(
+        "pane",
+        "quartz\n",
+        {"width": 80, "height": 24},
+        FlashCopyConfig(idle_timeout=1, idle_warning=0),
+        result_buffer="burst-result",
+    )
+    with os.fdopen(read_fd, encoding="utf-8") as reader, os.fdopen(write_fd, "wb") as writer:
+        monkeypatch.setattr(sys, "stdin", reader)
+        writer.write("quét\x03".encode())
+        writer.flush()
+        with pytest.raises(SystemExit) as exit_info:
+            ui.run()
+
+    rendered = capsys.readouterr()
+    assert exit_info.value.code == PopupExitCode.CANCEL
+    assert "> quét" in AnsiUtils.strip_ansi_codes(rendered.out + rendered.err)
