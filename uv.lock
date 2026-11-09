@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.10"
 
 [[package]]
@@ -221,7 +221,7 @@ wheels = [
 
 [[package]]
 name = "tmux-flash-copy"
-version = "1.6.1"
+version = "1.7.0"
 source = { editable = "." }
 
 [package.optional-dependencies]
