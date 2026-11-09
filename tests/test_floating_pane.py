@@ -19,6 +19,8 @@ def attached_tmux(monkeypatch):
     """Attach a real terminal to a disposable server, never the user's socket."""
     binary = shutil.which("tmux")
     if binary is None:
+        if os.environ.get("FLASH_COPY_REQUIRE_TMUX") == "1":
+            pytest.fail("CI requires tmux 3.8+; native tests must not be skipped")
         pytest.skip("tmux is not installed")
     environment = os.environ.copy()
     environment.pop("TMUX", None)
@@ -55,6 +57,8 @@ def attached_tmux(monkeypatch):
                 "sleep 30",
             )
             if not supports_floating_panes(tmux("display-message", "-p", "#{version}")):
+                if os.environ.get("FLASH_COPY_REQUIRE_TMUX") == "1":
+                    pytest.fail("CI requires stable tmux 3.8+; check the native runtime setup")
                 pytest.skip("native floating search requires stable tmux 3.8+")
             tmux("set-option", "-g", "default-shell", "/bin/sh")
             monkeypatch.setenv("TMUX", tmux("display-message", "-p", "#{socket_path},#{pid},0"))
